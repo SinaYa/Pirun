@@ -94,12 +94,25 @@ export function commandConfig() {
 	else {
 		out(`preset  ${shown.preset}  (${shown.harness})`);
 		out(`config  ${shown.file}`);
+		out(`store   ${shown.providers}`);
 		out(`use     ${shown.use}  (${shown.api.mode}  ${shown.api.baseUrl})`);
 		out(`model   ${shown.model}   effort ${shown.effort}`);
-		if (shown.prefix) out(`prefix  "${truncate(shown.prefix, 60)}"  (${shown.prefix.length} chars)`);
 		out(`dir     ${shown.dir}`);
 		out(`tools   ${shown.tools ? 'on' : 'off'}   context-files ${shown.contextFiles ? 'on' : 'off'}`);
 		out(`output  ${shown.full ? 'full' : 'digest'}  ${shown.json ? 'json' : 'text'}`);
+		if (state.preset.harness === 'antigravity') {
+			const api = shown.api as { profile: string; authenticated: boolean; agent: string };
+			out(`profile ${api.profile}`);
+			out(`login   ${api.authenticated ? 'ready' : 'required'}   agy-agent ${api.agent}`);
+		}
+		// The exact prefix, verbatim: a caller must be able to read back the
+		// standing instructions it (or someone else) persisted.
+		if (shown.prefix) {
+			out(`prefix  (${shown.prefix.length} chars)`);
+			for (const line of shown.prefix.split(/\r?\n/)) out(`  ${line}`);
+		} else {
+			out('prefix  (none)');
+		}
 	}
 }
 

@@ -86,6 +86,33 @@ test('behavior flags persist into the preset and load on the next call', () => {
 	assert.match(restore.stdout, /tools   on/);
 });
 
+test('config reads back everything the preset holds, prefix verbatim', () => {
+	const name = `${preset}-all`;
+	const prefix = 'Standing rule one.\nStanding rule two, kept verbatim well past sixty characters so truncation would show.';
+	const set = pirun(
+		'config', name,
+		'--use', 'deepseek', '--model', 'deepseek-chat', '--effort', 'high',
+		'--prefix', prefix, '--no-context-files', '--full'
+	);
+	assert.equal(set.status, 0, set.stderr);
+
+	const read = pirun('config', name);
+	assert.equal(read.status, 0, read.stderr);
+	assert.match(read.stdout, new RegExp(`preset  ${name}  \\(pi\\)`));
+	assert.match(read.stdout, /store   .*providers\.json/);
+	assert.match(read.stdout, /use     deepseek\/main/);
+	assert.match(read.stdout, /model   deepseek-chat   effort high/);
+	assert.match(read.stdout, /tools   on   context-files off/);
+	assert.match(read.stdout, /output  full  text/);
+	assert.match(read.stdout, new RegExp(`prefix  \\(${prefix.length} chars\\)`));
+	for (const line of prefix.split('\n')) {
+		assert.ok(read.stdout.includes(`  ${line}`), `prefix line not shown verbatim: ${line}`);
+	}
+
+	const cleared = pirun('config', name, '--no-prefix');
+	assert.match(cleared.stdout, /prefix  \(none\)/);
+});
+
 test('conflicting boolean flags are rejected', () => {
 	const result = pirun('config', preset, '--tools', '--no-tools');
 	assert.equal(result.status, 1);
