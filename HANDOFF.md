@@ -91,6 +91,20 @@ frozen legacy and still contains the proxy's home docs.
   (needs a human); revalidate like the isolation probe on agy upgrades.
   Fallback if agy misbehaves with piped stdin: the pre-dialog flow at commit
   52a6028 (`src/cli/auth.ts`).
+- **Auth keep-alive is an enforced per-harness requirement** (user decision
+  2026-08-27): every harness in `HARNESS_PROVIDERS` must declare in
+  `HARNESS_KEEPALIVE` (src/cli/keepalive.ts) either how its auth is
+  exercised or, explicitly with a reason, that keeping it alive is
+  impossible. A harness without a policy fails at import time and in tests.
+  Mechanism (investigated live): agy stores an access+refresh bundle in
+  `antigravity-cli/antigravity-oauth-token` and silently refreshes it on any
+  authenticated call when the access token (~1h) has expired, rewriting the
+  file. Pirun's keep-alive: every invocation cheap-checks freshness (file
+  mtimes only, never contents); accounts idle past
+  `PIRUN_AUTH_KEEPALIVE_DAYS` (default 3, 0 disables) get one detached
+  `agy -p "/usage"` — ordinary usage — with a 6h retry cool-down
+  (`%LOCALAPPDATA%\Pirun\auth-keepalive.json`). The token-file path is
+  version-sensitive (proven agy 1.1.21); revalidate on upgrades.
 - **Isolation is verified, not assumed.** Before login, Pirun probes that agy
   chose file-backed token storage (Windows: the SSH-env workaround, mode
   `ssh-file`) and refuses on keyring fallback. Version-sensitive: revalidate

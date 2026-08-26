@@ -49,6 +49,7 @@ import {
 	commandStatus
 } from '../src/cli/commands-info.ts';
 import { commandHelp } from '../src/cli/help.ts';
+import { commandKeepalive, maybeSpawnKeepalive } from '../src/cli/keepalive.ts';
 
 // Endpoint keys from .env reach every command — provider-store commands
 // (spend, providers, provider key) need them as much as preset launches do.
@@ -62,14 +63,20 @@ try {
 }
 
 const KNOWN_COMMANDS = new Set([
-	'agent', 'agents', 'fork', 'retire', 'run', 'start', '_supervise', 'poll', 'wait',
+	'agent', 'agents', 'fork', 'retire', 'run', 'start', '_supervise', '_keepalive', 'poll', 'wait',
 	'jobs', 'log', 'kill', 'clean', 'status', 'config', 'login', 'logout', 'providers',
 	'provider', 'spend', 'time', 'models', 'model', 'help', '--help', '-h'
 ]);
 if (!KNOWN_COMMANDS.has(args.command)) die(`unknown command "${args.command}". Run "pirun help".`);
 
-if (!['_supervise', 'help', '--help', '-h'].includes(args.command) && !PROVIDER_COMMANDS.has(args.command)) {
+if (!['_supervise', '_keepalive', 'help', '--help', '-h'].includes(args.command) && !PROVIDER_COMMANDS.has(args.command)) {
 	configurePreset(args);
+}
+
+// Opportunistic auth keep-alive: any normal invocation notices due accounts
+// and refreshes them in a detached worker, so idle accounts stay signed in.
+if (!['_supervise', '_keepalive', 'help', '--help', '-h'].includes(args.command)) {
+	maybeSpawnKeepalive();
 }
 
 switch (args.command) {
@@ -93,6 +100,9 @@ switch (args.command) {
 		break;
 	case '_supervise':
 		await commandSupervise(args);
+		break;
+	case '_keepalive':
+		await commandKeepalive();
 		break;
 	case 'poll':
 		commandPoll(args);

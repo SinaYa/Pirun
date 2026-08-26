@@ -87,6 +87,11 @@ the shared OS keyring. Fresh profiles are seeded `enableTelemetry: false`.
 Credentials never enter presets, the store, or the repo. `logout` sets the
 profile aside recoverably.
 
+Auth stays alive on its own: any pirun invocation notices accounts idle past
+`PIRUN_AUTH_KEEPALIVE_DAYS` (default 3, `0` disables) and refreshes them in a
+detached worker via one ordinary `agy` usage call — unused accounts stay
+signed in.
+
 ## Storage and development
 
 Runs live in `.runs/`; finished one-shots and orphaned sessions are pruned

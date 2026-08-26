@@ -230,6 +230,21 @@ export function antigravityAuthMarkerTime(profileDir: string) {
 	}
 }
 
+/**
+ * When agy last rewrote its OAuth token bundle (ms), or 0 when absent. agy
+ * refreshes the bundle silently whenever an authenticated call finds the
+ * access token expired, so this mtime is the auth-freshness signal — read as
+ * metadata only, never contents. Version-sensitive: path proven with agy
+ * 1.1.21; revalidate on upgrades.
+ */
+export function antigravityTokenTime(profileDir: string) {
+	try {
+		return statSync(resolve(profileDir, 'antigravity-cli', 'antigravity-oauth-token')).mtimeMs;
+	} catch {
+		return 0;
+	}
+}
+
 export function antigravityIsolationMode(profileDir: string): AntigravityIsolationMode {
 	try {
 		const marker = JSON.parse(readFileSync(authMarkerPath(profileDir), 'utf8')) as { isolationMode?: unknown };
