@@ -1,0 +1,310 @@
+version: 1
+
+settings:
+  provider:
+    type: string
+    required: true
+
+  model:
+    type: model_ref
+    required: true
+
+  messages:
+    type: messages
+    required: true
+
+  stream:
+    type: boolean
+    default: true
+
+  temperature:
+    type: number
+    default: 0.7
+
+  top_p:
+    type: number
+    default: 0.95
+
+  max_tokens:
+    type: integer
+    # A floor for models with no tuned entry below. Agentic turns need room;
+    # the variant's max_completion_tokens still caps this.
+    default: 16384
+
+  do_sample:
+    type: boolean
+    default: true
+
+  tool_stream:
+    type: boolean
+    default: false
+
+  presence_penalty:
+    type: number
+    default: 0
+
+  frequency_penalty:
+    type: number
+    default: 0
+
+  response_format:
+    type: object
+    default:
+      type: text
+
+  reasoning_effort:
+    type: enum
+    values: [none, minimal, low, medium, high, xhigh]
+    default: none
+
+  # --- completions-proxy additions -------------------------------------------
+  # Pass-through settings with no default: they are only sent upstream when the
+  # incoming OpenAI request actually carries them.
+
+  tools:
+    type: array
+
+  tool_choice:
+    type: any
+
+  parallel_tool_calls:
+    type: boolean
+
+  stop:
+    type: any
+
+  seed:
+    type: integer
+
+  n:
+    type: integer
+
+# ---------------------------------------------------------------------------
+# Per-model defaults.
+#
+# Precedence: a value the caller sends  >  model_defaults[<canonical model>]
+#             >  the global `settings` defaults above.
+#
+# Keys are canonical model names from inference-providers.yaml, so a model gets
+# the same tuning whichever provider serves it. `max_tokens` is still clamped by
+# the variant's `max_completion_tokens`.
+#
+# `source` records where the numbers came from. `inferred` means no vendor
+# figure was published and the value follows the model's family; `unpublished`
+# means nothing usable was found and the global defaults apply instead.
+# ---------------------------------------------------------------------------
+
+model_defaults:
+  # Moonshot fixes sampling for K2.7 Code (temp 1.0, top_p 0.95) and thinking
+  # mode cannot be disabled.
+  kimi-k2.7-code:
+    source: moonshot-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+    reasoning_effort: medium
+  kimi-k2.6:
+    source: moonshot-eval-config
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+  kimi-k2.5:
+    source: inferred-kimi-family
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+
+  # DeepSeek publishes temperature 1.0, and top_p 0.95 specifically for agentic
+  # use (1.0 otherwise). Lowering temperature collapses the reasoning trace.
+  deepseek-v4-pro:
+    source: deepseek-vllm-recipe
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 131072
+    reasoning_effort: medium
+  deepseek-v4-flash:
+    source: deepseek-vllm-recipe
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+  deepseek-v4-flash-vision:
+    source: inferred-deepseek-v4-flash
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+  deepseek-v3.2:
+    source: inferred-deepseek-reasoner
+    temperature: 0.6
+    top_p: 0.95
+    max_tokens: 32768
+
+  glm-5.2:
+    source: zai-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+    reasoning_effort: medium
+  glm-5.1:
+    source: inferred-glm-5-family
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+  glm-5:
+    source: inferred-glm-5-family
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  # Z.ai documents 0.7 / 1.0 for tool-calling and agent benchmarks on 4.7.
+  glm-4.7:
+    source: zai-tool-calling-guidance
+    temperature: 0.7
+    top_p: 1.0
+    max_tokens: 32768
+  glm-4.7-flash:
+    source: zai-tool-calling-guidance
+    temperature: 0.7
+    top_p: 1.0
+    max_tokens: 32768
+
+  gemma-4-31b-it:
+    source: gemma-4-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+
+  minimax-m3:
+    source: minimax-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+    reasoning_effort: medium
+  minimax-m2.7:
+    source: minimax-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  minimax-m2.5:
+    source: minimax-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+
+  mimo-v2.5-pro:
+    source: xiaomi-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+  mimo-v2.5:
+    source: inferred-mimo-family
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+
+  # Qwen3 thinking-mode figures from the Qwen3.8 card: 1.0 / 0.95 / top_k 20.
+  # top_k is not carried by this interface yet — see LIMITATIONS.md.
+  qwen3.8-27b:
+    source: qwen3.8-model-card
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  qwen3.7-max:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 65536
+    reasoning_effort: medium
+  qwen3.7-plus:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  qwen3.7-flash:
+    # Official Qwen3.7 thinking-mode defaults are 0.6 / 0.95 / top_k 20.
+    # top_k is not carried by this interface yet — see LIMITATIONS.md.
+    source: qwen3.7-thinking-api-defaults
+    temperature: 0.6
+    top_p: 0.95
+    max_tokens: 65536
+  qwen3.6-max-preview:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  qwen3.6-plus:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  qwen3.6-27b:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  qwen3.5-397b-a17b:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  qwen3.5-9b:
+    source: inferred-qwen3-thinking
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 16384
+
+  # StepFun: 1.0 / 0.95 for reasoning and agent scenarios (0.6 for plain chat).
+  step-3.7-flash:
+    source: stepfun-guidance
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+  step-3.5-flash:
+    source: stepfun-guidance
+    temperature: 1.0
+    top_p: 0.95
+    max_tokens: 32768
+
+  # NVIDIA: reasoning on -> 0.6 / 0.95; greedy when reasoning is off.
+  nemotron-3-ultra:
+    source: nvidia-model-card
+    temperature: 0.6
+    top_p: 0.95
+    max_tokens: 32768
+    reasoning_effort: medium
+
+  hy3:
+    source: tencent-model-card
+    temperature: 0.9
+    top_p: 1.0
+    max_tokens: 32768
+    reasoning_effort: high
+
+  # xAI publishes no fixed number, only "start at 0 or below 1 and raise it".
+  # 0.3 is this project's choice for agentic coding, not a vendor figure.
+  grok-4.5:
+    source: inferred-xai-guidance
+    temperature: 0.3
+    top_p: 1.0
+    max_tokens: 32768
+    reasoning_effort: medium
+
+  laguna-s-2.1:
+    source: poolside-eval-config
+    temperature: 1.0
+    top_p: 1.0
+    max_tokens: 32768
+
+  muse-spark-1.2:
+    source: meta-defaults
+    temperature: 1.0
+    top_p: 1.0
+    max_tokens: 32768
+
+  # No published guidance found for these. ox-alpha is a stealth model in no
+  # catalogue, but it demonstrably returns reasoning_content, and a small
+  # max_tokens leaves the reasoning trace no room to finish — so it gets a
+  # budget rather than the global floor. Sampling values stay unpublished.
+  greg-1:
+    source: unpublished
+  ox-alpha:
+    source: observed
+    max_tokens: 32768

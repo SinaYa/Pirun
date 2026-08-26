@@ -1,0 +1,68 @@
+# Cascaded inference routing rules.
+#
+# This file is intentionally a tiny custom syntax, not YAML.
+#
+# Terminology:
+#   A rule is one routing instruction.
+#   The selector is the left side of a rule. It describes which requested
+#   provider/model calls the rule matches.
+#   The override is the right side of a rule. It describes which provider/model
+#   should actually be used when the selector matches.
+#   A variant is a provider-local model option. Variant names only have meaning
+#   inside one concrete provider and one concrete model.
+#
+# Rule syntax:
+#   selector = override
+#   selector = override prefer dimension:weight,dimension:weight
+#
+# Later matching rules override earlier matching rules.
+#
+# References:
+#   provider>model
+#   provider>model@variant
+#   provider>model>variant
+#
+# To specify a variant, both provider and model must be concrete names.
+# This applies on both sides of the rule. For example:
+#   deepseek>deepseek-v4-pro@fast
+# is valid syntax, but:
+#   *>deepseek-v4-pro@fast
+# is invalid because the provider is wildcarded.
+#
+# Wildcards:
+#   *             matches all providers and all models
+#   **            same as *
+#   *>*           same as *
+#   provider>*    all models from one provider
+#   *>model       one model from all providers
+#   *model        shorthand for *>model
+#
+# Groups:
+#   Groups are defined in inference-model-groups.rules and referenced with $.
+#   Group references can be used with &, |, !, and parentheses:
+#     *>($weak-model & !$cheap-model) = crofai>$strong-model
+#   _same helpers match parts of the originally requested target.
+#   Add ! before any condition to negate it:
+#     _same        the exact same provider/model/variant
+#     *>_same      the same canonical model
+#     _same>*      the same provider
+#     !_same       negated version of the same check
+#     * = *>($reliable-model & !_same)
+#
+# Preferences:
+#   Use prefer when an override can match multiple choices.
+#   Preference dimensions are defined in inference-model-scores.yaml.
+#   Use either all weighted or all unweighted dimensions in one prefer clause:
+#     * = *>($reliable-model) prefer reliability:70,intelligence:30
+#     * = *>($fast-model) prefer speed,price
+#
+# Override examples:
+#   crofai>kimi-k2.6 = deepseek>deepseek-v4-pro
+#   *>deepseek-v4-pro = deepseek>deepseek-v4-pro
+#   *>old-model = *>new-model
+#   * = deepseek>deepseek-v4-pro
+#   * = *>($reliable-model & !_same) prefer reliability:50,intelligence:30,price:20
+#
+# Comments start with # anywhere on a line. Empty and whitespace-only lines are ignored.
+
+# No active provider substitutions. Flows select Command Code directly.
