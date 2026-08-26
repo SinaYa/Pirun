@@ -83,6 +83,14 @@ frozen legacy and still contains the proxy's home docs.
 - **No OAuth secrets anywhere durable** — not in config files, commits, docs,
   or chat. Presence checks only; never print token files or account
   identities.
+- **Login is pirun's own dialog** (user requirement 2026-08-27): Antigravity's
+  interactive UI must never be shown to the human. agy runs fully piped; pirun
+  scrapes the OAuth URL, opens the browser, relays the pasted code, detects
+  success from the profile on disk, and terminates agy itself — no `/quit`.
+  ⚠ Piped-stdin login is NOT yet validated against a real Google sign-in
+  (needs a human); revalidate like the isolation probe on agy upgrades.
+  Fallback if agy misbehaves with piped stdin: the pre-dialog flow at commit
+  52a6028 (`src/cli/auth.ts`).
 - **Isolation is verified, not assumed.** Before login, Pirun probes that agy
   chose file-backed token storage (Windows: the SSH-env workaround, mode
   `ssh-file`) and refuses on keyring fallback. Version-sensitive: revalidate

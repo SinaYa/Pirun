@@ -266,12 +266,18 @@ export async function commandLogin(args: Args) {
 	}
 	try {
 		await loginAntigravityAccount(account, true);
+		if (holdOpen) {
+			// A successful login window closes itself; the human is done here.
+			await new Promise((resolveClose) => setTimeout(resolveClose, 3000));
+			process.exit(0);
+		}
 	} catch (error) {
 		if (!holdOpen) die(error instanceof Error ? error.message : String(error));
+		// Keep a failed window open so the error stays readable.
 		out(`error: ${error instanceof Error ? error.message : String(error)}`);
 		process.exitCode = 1;
+		await holdLoginWindowOpen();
 	}
-	if (holdOpen) await holdLoginWindowOpen();
 }
 
 export function commandLogout(args: Args) {

@@ -2,6 +2,7 @@
 
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import {
 	antigravityAuthMarkerTime,
 	antigravityBaseArgs,
@@ -86,6 +87,107 @@ export function antigravityAccountProfileDir(account: string) {
 	return stored ? resolve(stored) : antigravityProfileDir(account);
 }
 
+/** The minimal child surface the login dialog needs; a test can fake it. */
+export interface LoginChild {
+	stdout: NodeJS.ReadableStream | null;
+	stderr: NodeJS.ReadableStream | null;
+	stdin: NodeJS.WritableStream | null;
+	pid?: number;
+	exitCode: number | null;
+	once(event: 'exit' | 'error', listener: (...args: unknown[]) => void): unknown;
+}
+
+function stripAnsi(text: string) {
+	return text.replace(/\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))/g, '');
+}
+
+/**
+ * Pirun's own login interface. Antigravity's interactive UI is never shown:
+ * agy runs fully piped in the background while the human sees only these
+ * prompts. The OAuth URL is scraped from agy's output for the browser, pasted
+ * lines are relayed to agy's stdin, and success is detected by inspecting the
+ * profile on disk — so no `/quit`, no harness TUI. On failure, agy's last
+ * output lines are surfaced as context.
+ */
+export async function runAntigravityLoginDialog(options: {
+	account: string;
+	profileDir: string;
+	child: LoginChild;
+	input?: NodeJS.ReadableStream;
+	openUrl?: (url: string) => void;
+	print?: (line?: string) => void;
+	timeoutMs?: number;
+	pollMs?: number;
+}): Promise<{ ok: true } | { ok: false; reason: string; context: string[] }> {
+	const print = options.print ?? out;
+	const openUrl = options.openUrl ?? openBrowserUrl;
+	const input = options.input ?? process.stdin;
+	const startedAt = Date.now();
+	const deadline = startedAt + (options.timeoutMs ?? 15 * 60_000);
+	const child = options.child;
+
+	print(`Signing in Antigravity account "${options.account}" (isolated profile).`);
+	print('Waiting for the sign-in link…');
+
+	let buffer = '';
+	let opened = false;
+	const watch = (stream: NodeJS.ReadableStream | null) => {
+		stream?.on('data', (chunk) => {
+			buffer = `${buffer}${String(chunk)}`.slice(-32_000);
+			if (opened) return;
+			const url = antigravityOAuthUrl(buffer);
+			if (url) {
+				opened = true;
+				openUrl(url);
+				print('Browser opened — sign in with Google.');
+				print(`If it did not open, use this link: ${url}`);
+				print('If the page shows an authorization code, paste it here and press Enter.');
+			}
+		});
+	};
+	watch(child.stdout);
+	watch(child.stderr);
+
+	const reader = createInterface({ input, terminal: false });
+	reader.on('line', (line) => child.stdin?.write(`${line}\n`));
+
+	let exited = false;
+	child.once('exit', () => {
+		exited = true;
+	});
+	child.once('error', () => {
+		exited = true;
+	});
+
+	const lastOutput = () =>
+		stripAnsi(buffer).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-5);
+
+	try {
+		while (Date.now() < deadline) {
+			const inspected = inspectAntigravityProfile(options.profileDir, startedAt);
+			if (inspected.usesKeyring) {
+				return { ok: false, reason: 'the login left the isolated file-backed profile (keyring detected)', context: lastOutput() };
+			}
+			if (inspected.authenticated && inspected.usesFileStorage) return { ok: true };
+			if (exited && child.exitCode !== null) {
+				// One last look: the success record can land just before exit.
+				const final = inspectAntigravityProfile(options.profileDir, startedAt);
+				if (final.authenticated && final.usesFileStorage && !final.usesKeyring) return { ok: true };
+				return {
+					ok: false,
+					reason: `Antigravity exited (${child.exitCode}) before authentication completed`,
+					context: lastOutput()
+				};
+			}
+			await new Promise((resolvePoll) => setTimeout(resolvePoll, options.pollMs ?? 500));
+		}
+		return { ok: false, reason: 'the sign-in did not complete within 15 minutes', context: lastOutput() };
+	} finally {
+		reader.close();
+		if (child.exitCode === null && child.pid) terminateProcessTree(child.pid);
+	}
+}
+
 export async function loginAntigravityAccount(account: string, force = false) {
 	const profileDir = antigravityAccountProfileDir(account);
 	const alreadyAuthenticated = hasAntigravityAuthMarker(profileDir);
@@ -100,44 +202,17 @@ export async function loginAntigravityAccount(account: string, force = false) {
 		out(`Checking isolated credential storage for account "${account}"…`);
 		isolationMode = await verifyAntigravityIsolation(entry, profileDir, cwd);
 	}
-	out(`Opening Antigravity login for account "${account}".`);
-	out('Authenticate in the browser. If the page shows a code, paste it here and press Enter.');
-	out('When Antigravity shows the signed-in account, use /quit to continue.');
-	const startedAt = Date.now();
 	const child = spawn(entry, antigravityBaseArgs(profileDir), {
 		cwd,
-		stdio: isolationMode === 'ssh-file' ? ['inherit', 'pipe', 'pipe'] : 'inherit',
-		windowsHide: false,
+		stdio: ['pipe', 'pipe', 'pipe'],
+		windowsHide: true,
 		env: antigravityEnv(isolationMode)
 	});
-	if (isolationMode === 'ssh-file') {
-		let opened = false;
-		let urlBuffer = '';
-		const forward = (stream: NodeJS.ReadableStream | null, destination: NodeJS.WriteStream) => {
-			stream?.on('data', (chunk) => {
-				const text = String(chunk);
-				destination.write(text);
-				if (opened) return;
-				urlBuffer = `${urlBuffer}${text}`.slice(-32_000);
-				const url = antigravityOAuthUrl(urlBuffer);
-				if (url) {
-					opened = true;
-					openBrowserUrl(url);
-				}
-			});
-		};
-		forward(child.stdout, process.stdout);
-		forward(child.stderr, process.stderr);
-	}
-	const exitCode = await waitForChildExit(child);
-	const inspected = inspectAntigravityProfile(profileDir, startedAt);
-	if (!inspected.usesFileStorage || inspected.usesKeyring) {
-		throw new Error('Antigravity login did not remain inside the isolated file-backed profile.');
-	}
-	if (!inspected.authenticated) {
+	const result = await runAntigravityLoginDialog({ account, profileDir, child });
+	if (!result.ok) {
+		for (const line of result.context) out(`agy: ${line}`);
 		throw new Error(
-			`Antigravity exited (${exitCode}) before Pirun could confirm authentication. Run ` +
-			`"pirun login antigravity ${account}" and finish the browser sign-in.`
+			`${result.reason}. Run "pirun login antigravity ${account}" to try again.`
 		);
 	}
 	markAntigravityAuthenticated(profileDir, isolationMode);
@@ -168,7 +243,7 @@ export async function loginAntigravityWindowed(account: string) {
 	child.unref();
 	out(`Opened a separate login window for Antigravity account "${account}".`);
 	out('Sign in with the browser. If Google shows an authorization code, paste it into that window.');
-	out('When Antigravity shows the signed-in account, type /quit there. Waiting up to 15 minutes…');
+	out('The window closes itself when the sign-in completes. Waiting up to 15 minutes…');
 	const deadline = Date.now() + 15 * 60_000;
 	while (Date.now() < deadline) {
 		if (antigravityAuthMarkerTime(profileDir) >= startedAt) {
