@@ -1,0 +1,147 @@
+# Pirun handoff
+
+Last updated: 2026-08-27. Read this first in a new chat. It records the user's
+intent and every standing decision. Supersedes `PIRUN-HANDOFF.md` (kept as
+history of the v1 phase). Current usage reference: `README.md`,
+`FOR-AGENTS.md`.
+
+## What this project is
+
+Pirun is the stable front door for delegating work to coding-agent harness
+CLIs (currently Pi and Antigravity; more will be added). It runs at
+`D:\projectx\pirun`, its own git repo, extracted 2026-08-27 from
+`D:\projectx\CladGPT\completions-proxy` (root commit `d01d05e`, copy of
+CladGPT `f783693`). **Work here, not in the CladGPT copy** — that one is
+frozen legacy and still contains the proxy's home docs.
+
+## Product intent (the user's, verbatim in spirit)
+
+1. **Pirun is for AIs.** The primary user is an orchestrating AI. Optimize UXA
+   (User Experience for AI): shortest commands, fewest turns, one-call
+   discovery, errors that contain the exact fixing command. Zero compromises —
+   new features must reduce, not add, turns and length.
+2. **Many harnesses.** Antigravity is one of several future harness CLIs.
+   Write code and docs harness-agnostically ("never a harness CLI directly",
+   capability-based wording), never enumerating the current pair as if final.
+3. **Two consumption ways.** A harness's own accounts (Antigravity), and
+   OpenAI-completions-compatible endpoints. Some harnesses may someday have
+   both; `--use` decides.
+4. **Authenticate once, share everywhere.** Providers (endpoints + api keys,
+   harnesses + logins) live in one machine-global store
+   (`%LOCALAPPDATA%\Pirun\providers.json`), never in presets. Presets are
+   pointers: `use`, model, effort, prefix, dir, behavior flags.
+5. **No setup ceremony.** No config command. Every preset command takes the
+   preset positionally; settings supplied on a launch persist into it, omitted
+   ones load from it. Prompts and `--time` never persist. `pirun config` is
+   inspection only.
+6. **Canonical endpoints have pre-knowledge.** openai, deepseek, openrouter,
+   groq, mistral, xai ship with base URL, compat quirks, model catalog,
+   standard env var. `--use deepseek` with `DEEPSEEK_API_KEY` set needs zero
+   setup; `DEEPSEEK_API_KEY_<NAME>` is the multi-account suffix convention.
+7. **One consumption-status interface.** `pirun spend` answers for everything:
+   endpoint accounts → credits/balance; harness accounts → rate-limit windows
+   (five-hour/weekly/monthly), % remaining, reset times.
+8. **Effort is intent.** `--effort off|min|low|medium|high|max|<n>k` is stored
+   per preset and mapped per model/harness at call time (Pi `--thinking`,
+   Antigravity `--effort`). Safe on knobless models; digest notes when ignored.
+9. **Prompt prefix.** `--prefix`/`--prefix-file`/`--no-prefix` persist text
+   prepended to every prompt of a preset — standing instructions live there,
+   not in every task. Lives on the preset, not the named agent.
+10. **Timers are required and never persisted.** One flag,
+    `--time <return-after>/<timeout>`, on every run/agent/fork/start. No
+    defaults ever — the AI must consciously choose. Meaning (user's framing):
+    - **return-after = "when do I next look?"** Bounds only the caller.
+      Must be positive: there is NO fire-and-forget flag, by design — the AI
+      must always come back to a decision point with stuck-vs-slow evidence
+      (exit code 2 + progress digest). True detachment = background the pirun
+      command itself, which proves the caller chose concurrency.
+    - **timeout = "how long would prove something is wrong?"** A failure
+      detector, NOT a completion estimate or budget. Set past any healthy
+      duration; firing means broken, not slow.
+    - return-after may exceed timeout (stay attached to observe the timeout).
+    - `pirun time <preset> <id> +30m` (extend) vs `45m` (set from now): both
+      exist so the reference point is in the spelling, never ambiguous.
+11. **Easy account adding.** Windows login opens a separate visible console
+    window so a human can always paste Google's auth code, even when Pirun was
+    invoked by an AI. New Antigravity profiles are seeded
+    `enableTelemetry: false` — the user is unequivocal: no interaction-data
+    sharing by default, ever.
+12. **Docs are dense and model-agnostic.** No prose, no bloat; compact but
+    complete. `FOR-AGENTS.md` (the pirun runbook) must contain no concrete
+    model names or model-behavior advice — placeholders like `<model-id>`
+    only. Provider names (deepseek, antigravity…) are fine. Proxy-specific
+    docs (API.md etc.) may keep concrete models; the proxy is a different
+    subject.
+
+## Hard constraints (do not violate)
+
+- **The Antigravity backend must see ordinary CLI usage.** No direct calls to
+  Google APIs, no synthetic traffic, nothing that could fingerprint the
+  accounts or cause undisclosed cost. Quota is fetched via `agy -p "/usage"`
+  (agy's own print-mode slash command); models via `agy models`. Keep it that
+  way for any new capability.
+- **No OAuth secrets anywhere durable** — not in config files, commits, docs,
+  or chat. Presence checks only; never print token files or account
+  identities.
+- **Isolation is verified, not assumed.** Before login, Pirun probes that agy
+  chose file-backed token storage (Windows: the SSH-env workaround, mode
+  `ssh-file`) and refuses on keyring fallback. Version-sensitive: revalidate
+  on agy upgrades (proven with agy 1.1.21).
+- **Deletions are recoverable.** `logout` renames profiles aside; nothing
+  recursively deletes credentials. The user previously required Recycle-Bin
+  style removal for profiles.
+- **Automated tests never touch OAuth, browsers, or live accounts** — offline
+  string/file logic only. Live checks are cheap real runs ("Reply with exactly
+  OK.") the user is fine with; run them without asking, guard against waste
+  not spend.
+
+## Current state
+
+- 46 tests pass (`npm test`); `npm run check` is syntax-check only.
+- Two live Antigravity accounts, `antigravity-one` and `antigravity-two`,
+  authenticated in isolated profiles under `%LOCALAPPDATA%\Pirun\profiles\`,
+  shared through the global store with the legacy checkout. Presets of the
+  same names point at them.
+- v1→v2 migration is automatic and idempotent (`migratePresetsToProviders`);
+  old flags are rejected with pointers to replacements.
+- The bundled proxy (`--use bundled`, port 8899) still lives inside this repo
+  (`src/server.ts`, `src/command-code-cli-adapter.ts`, `config/`); Pi and
+  speedtest use it. Endpoint presets register as native Pi
+  `openai-completions` providers keyed by provider/account in Pi's
+  `models.json`.
+- Known cosmetic/deferred items: `pirun help` example still names a concrete
+  model (`deepseek-chat`) — user wants a placeholder when code is next
+  touched; Windows browser auto-open uses `rundll32` (the path that works).
+
+## Source map (pre-modularization)
+
+`bin/pirun.ts` (~3,000 lines: CLI, presets, jobs, supervisor, digests, all
+commands) · `src/pirun-providers.ts` (store, catalog, --use, effort) ·
+`src/pirun-config.ts` (presets, migration, Pi registry sync) ·
+`src/pirun-antigravity.ts` (profiles, isolation, OAuth URL, /usage parsing) ·
+`src/pirun-provider-net.ts` (spend, /models) · `src/pirun-time.ts` (--time) ·
+`src/pirun-args.ts` (strict parser, moved-flag messages) · proxy: `server.ts`,
+`command-code-cli-adapter.ts`, `inference-provider-config.ts`, `config/`.
+
+## Next phase (user's explicit plan — wait for instructions per step)
+
+1. **Modularize**: no huge code files. Targets: `bin/pirun.ts` first; also
+   `server.ts`, `inference-provider-config.ts`, `command-code-cli-adapter.ts`.
+2. **Separate the proxy concern from the Pirun front door** — Pirun
+   independent of the proxy and of CladGPT; the extraction copy was step one.
+3. Then refactor/code-improvement generally, and eventually more harness CLIs
+   behind an adapter boundary (auth, sessions, forking, tools, providers as
+   explicit capabilities) — with zero change to what harness backends observe.
+
+## Working style the user expects
+
+- Decide architecture yourself; ask only what only they can answer. Wire to
+  the real system — no stand-ins beside dead paths.
+- Implement fully in one run, verify live, then commit with detailed messages
+  (`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`).
+- When they ask a design question, answer compactly ("without prose") and get
+  approval before writing files; keep before-copies when they want to review
+  doc rewrites.
+- Verification habit for a fresh chat: `git log -5 --oneline`,
+  `node bin\pirun.ts providers`, and if needed one minimal live run per
+  account: `node bin\pirun.ts run antigravity-one --time 2m/5m "Reply with exactly OK."`
