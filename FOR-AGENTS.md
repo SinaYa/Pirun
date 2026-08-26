@@ -44,10 +44,6 @@ five-hour/weekly/monthly limits, % remaining, and reset times. Check it before
 picking an account for heavy work. `pirun logout antigravity <account>` sets a
 profile aside recoverably.
 
-Auth keep-alive is automatic: any pirun invocation refreshes harness accounts
-idle past `PIRUN_AUTH_KEEPALIVE_DAYS` (default 3) in a detached worker —
-unused accounts stay signed in; nothing for you to do.
-
 ## Model, effort, permissions, prefix (persist per preset)
 
 - `--model <fragment>` — an unambiguous fragment of an id resolves against the
