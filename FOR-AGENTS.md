@@ -60,9 +60,10 @@ profile aside recoverably.
   the supported ones. When the agent wants something the level denies, the
   digest carries `permission:` lines with the exact widening command — treat
   them as the agent asking you; decide, then rerun or widen.
-- `--prefix "…"` / `--prefix-file <path>` / `--no-prefix` — text prepended to
-  every prompt of the preset. Put standing instructions here once instead of
-  repeating them per task.
+- `--prefix "…"` / `--prefix-file <path|->` / `--no-prefix` — text prepended
+  to every prompt of the preset; `-` reads it from stdin
+  (`echo rules | pirun config p --prefix-file -`), no temp file. Put standing
+  instructions here once instead of repeating them per task.
 
 ## Timers — required, never persisted
 

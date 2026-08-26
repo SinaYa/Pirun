@@ -40,7 +40,9 @@ export const state = {
 	defaultModel: '',
 	providersStore: loadProvidersStore() as ProvidersStore,
 	/** The preset's resolved provider/account, set by configurePreset. */
-	use: { kind: 'endpoint', provider: '', account: '', created: false } as ResolvedUse
+	use: { kind: 'endpoint', provider: '', account: '', created: false } as ResolvedUse,
+	/** Set when --prefix-file - consumed stdin; the task must then be explicit. */
+	stdinUsedForPrefix: false
 };
 
 /* -------------------------------------------------------------------------- */

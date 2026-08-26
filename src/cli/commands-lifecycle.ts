@@ -50,6 +50,9 @@ export function readTask(args: Args): string {
 
 	if (args.positional.length) return withPrefix(args.positional.join(' '));
 
+	if (state.stdinUsedForPrefix) {
+		die('stdin already carried the prefix (--prefix-file -); pass the task with --task "…", --file <path>, or positionally.');
+	}
 	if (process.stdin.isTTY) {
 		die('no task given. Pass --task "…", --file <path>, a positional argument, or pipe it on stdin.');
 	}

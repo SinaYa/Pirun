@@ -94,8 +94,9 @@ Persistent preset options (accepted by every preset command):
                                    a harness cannot honor is refused with its
                                    alternatives; denied actions surface in the
                                    digest as permission asks
-  --prefix "<text>" | --prefix-file <path> | --no-prefix
-                                   text prepended to every prompt of this preset
+  --prefix "<text>" | --prefix-file <path|-> | --no-prefix
+                                   text prepended to every prompt of this
+                                   preset; "-" reads it from stdin
   --dir <path>  --antigravity-agent <name>
   --tools|--no-tools --context-files|--no-context-files
   --full|--no-full --json|--no-json

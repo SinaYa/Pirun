@@ -133,6 +133,29 @@ test('config reads back everything the preset holds, prefix verbatim', () => {
 	assert.match(cleared.stdout, /prefix  \(none\)/);
 });
 
+test('the prefix pipes in on stdin with --prefix-file -', () => {
+	const name = `${preset}-stdinprefix`;
+	const prefix = 'Rule one.\nRule two via stdin.';
+	const set = spawnSync(
+		process.execPath,
+		[pirunEntry, 'config', name, '--use', 'deepseek', '--model', 'deepseek-chat', '--prefix-file', '-'],
+		{ cwd: projectDir, env: testEnv, encoding: 'utf8', timeout: 30_000, input: prefix }
+	);
+	assert.equal(set.status, 0, set.stderr);
+	for (const line of prefix.split('\n')) {
+		assert.ok(set.stdout.includes(`  ${line}`), `prefix line not stored verbatim: ${line}`);
+	}
+
+	// stdin cannot carry the prefix and the task at once; the error names the fix.
+	const clash = spawnSync(
+		process.execPath,
+		[pirunEntry, 'run', name, '--time', '1m/2m', '--prefix-file', '-'],
+		{ cwd: projectDir, env: testEnv, encoding: 'utf8', timeout: 30_000, input: 'text' }
+	);
+	assert.equal(clash.status, 1);
+	assert.match(clash.stderr, /stdin already carried the prefix.*--task|--task "…", --file <path>, or positionally/);
+});
+
 test('conflicting boolean flags are rejected', () => {
 	const result = pirun('config', preset, '--tools', '--no-tools');
 	assert.equal(result.status, 1);

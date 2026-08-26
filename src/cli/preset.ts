@@ -171,7 +171,12 @@ export function configurePreset(args: Args) {
 	if ((prefix || prefixFile) && args.flags.has('no-prefix')) die('--no-prefix cannot be combined with --prefix.');
 	if (prefix && prefixFile) die('--prefix and --prefix-file cannot be used together.');
 	if (prefix) preset.prefix = prefix;
-	if (prefixFile) {
+	if (prefixFile === '-') {
+		// Pipe the prefix in with no temp file: echo "…" | pirun config p --prefix-file -
+		if (process.stdin.isTTY) die('--prefix-file - reads the prefix from stdin; pipe the text in.');
+		preset.prefix = readFileSync(0, 'utf8').trim();
+		state.stdinUsedForPrefix = true;
+	} else if (prefixFile) {
 		if (!existsSync(prefixFile)) die(`prefix file not found: ${prefixFile}`);
 		preset.prefix = readFileSync(prefixFile, 'utf8').trim();
 	}
