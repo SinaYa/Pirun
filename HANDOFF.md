@@ -69,9 +69,9 @@ frozen legacy and still contains the proxy's home docs.
 12. **Docs are dense and model-agnostic.** No prose, no bloat; compact but
     complete. `FOR-AGENTS.md` (the pirun runbook) must contain no concrete
     model names or model-behavior advice — placeholders like `<model-id>`
-    only. Provider names (deepseek, antigravity…) are fine. Proxy-specific
-    docs (API.md etc.) may keep concrete models; the proxy is a different
-    subject.
+    only. Provider names (deepseek, antigravity…) are fine. It also carries
+    ONLY what changes how the orchestrator acts: passive traits (auth
+    keep-alive and the like) belong in README/HANDOFF, never there.
 
 ## Hard constraints (do not violate)
 
