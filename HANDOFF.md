@@ -97,7 +97,14 @@ frozen legacy and still contains the proxy's home docs.
 
 ## Current state
 
-- 46 tests pass (`npm test`); `npm run check` is syntax-check only.
+- 59 tests pass (`npm test`, which also runs the line-cap guard); `npm run
+  check` syntax-checks every source file and runs the guard.
+- **Anti-bloat guard**: no source file may exceed 400 lines
+  (`scripts/max-lines.mjs`). Enforced in `npm test`, `npm run check`, and a
+  pre-commit hook (`.githooks/pre-commit`; `core.hooksPath` is set by npm's
+  prepare step — after a fresh clone, `npm install` or `npm run setup-hooks`
+  re-arms it). When it fires, split the file into modules; do not raise the
+  cap or grow the exempt list.
 - Two live Antigravity accounts, `antigravity-one` and `antigravity-two`,
   authenticated in isolated profiles under `%LOCALAPPDATA%\Pirun\profiles\`,
   shared through the global store with the legacy checkout. Presets of the
@@ -113,20 +120,37 @@ frozen legacy and still contains the proxy's home docs.
   model (`deepseek-chat`) — user wants a placeholder when code is next
   touched; Windows browser auto-open uses `rundll32` (the path that works).
 
-## Source map (pre-modularization)
+## Source map (modularized 2026-08-27; every file ≤ 400 lines)
 
-`bin/pirun.ts` (~3,000 lines: CLI, presets, jobs, supervisor, digests, all
-commands) · `src/pirun-providers.ts` (store, catalog, --use, effort) ·
-`src/pirun-config.ts` (presets, migration, Pi registry sync) ·
-`src/pirun-antigravity.ts` (profiles, isolation, OAuth URL, /usage parsing) ·
-`src/pirun-provider-net.ts` (spend, /models) · `src/pirun-time.ts` (--time) ·
-`src/pirun-args.ts` (strict parser, moved-flag messages) · proxy: `server.ts`,
-`command-code-cli-adapter.ts`, `inference-provider-config.ts`, `config/`.
+`bin/pirun.ts` (dispatcher only) → `src/cli/`: `context.ts` (paths, shared
+mutable state, out/die, formatters) · `pi.ts` (Pi discovery, proxy catalogue,
+model resolution) · `preset.ts` (configurePreset, flag persistence) ·
+`proxy.ts` (bundled-proxy lifecycle) · `store.ts` (jobs, agents, sessions,
+locks, retention) · `digest.ts` (event stream → digest) · `render.ts` (digest
+and live-progress output) · `auth.ts` (Antigravity login/isolation) ·
+`spawn.ts` (createJob, harness spawn, supervisor) · `commands-*.ts` (one file
+per command family) · `help.ts`.
+
+Proxy: `src/server.ts` (router entry; re-exports parseRequestTarget) →
+`src/proxy/`: `http.ts` (settings, log, send helpers) · `shape.ts` (request
+target/value shaping) · `handlers.ts` (chat/text/models/routing) · `stream.ts`
+(SSE piping). `src/inference-provider-config.ts` is now a barrel over
+`src/inference/`: `types.ts` · `rules-parser.ts` · `catalog.ts` (YAML load,
+scores, defaults) · `routing-state.ts` (snapshot cache + recovery) ·
+`resolve.ts`. `src/command-code-cli-adapter.ts` (endpoint surface + response
+assembly) over `src/command-code/`: `protocol.ts` · `retry.ts` · `run.ts`.
+`bin/install.ts` (flow) over `src/install/`: `report.ts` · `steps.ts` ·
+`pi-registry.ts`. `src/pirun-providers.ts` (store + --use resolution)
+re-exports `src/pirun-provider-catalog.ts` (canonical endpoints, models,
+effort mapping). Unchanged: `pirun-config.ts`, `pirun-antigravity.ts`,
+`pirun-provider-net.ts`, `pirun-time.ts`, `pirun-args.ts`, `pirun-files.ts`,
+`pirun-process.ts`, `config/`.
 
 ## Next phase (user's explicit plan — wait for instructions per step)
 
-1. **Modularize**: no huge code files. Targets: `bin/pirun.ts` first; also
-   `server.ts`, `inference-provider-config.ts`, `command-code-cli-adapter.ts`.
+1. ~~**Modularize**~~ — done 2026-08-27 (see source map and the anti-bloat
+   guard above). CLI surface characterization tests added in
+   `test/pirun-cli-surface.test.ts`.
 2. **Separate the proxy concern from the Pirun front door** — Pirun
    independent of the proxy and of CladGPT; the extraction copy was step one.
 3. Then refactor/code-improvement generally, and eventually more harness CLIs

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Pirun pre-commit: refuse commits that push a source file over the line cap.
+# Installed by `npm run setup-hooks` (also run by npm's prepare step).
+node scripts/max-lines.mjs || exit 1

@@ -1,0 +1,172 @@
+/** Rendering digests and live-progress handoffs for the caller. */
+
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { encode } from 'gpt-tokenizer';
+import type { PirunArgs as Args } from '../pirun-args.ts';
+import { humanDuration, humanTokens, isRecord, out, state, truncate } from './context.ts';
+import { proxyErrorsBetween } from './proxy.ts';
+import { jobDir, type JobMeta } from './store.ts';
+import type { Digest } from './digest.ts';
+
+export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boolean; label?: string }) {
+	const elapsed = (meta.finishedAt ?? Date.now()) - meta.startedAt;
+	const total = digest.inputTokens + digest.cachedTokens;
+	const hit = total ? Math.round((digest.cachedTokens / total) * 100) : 0;
+	const parts = [
+		`turns=${digest.turns}`,
+		humanDuration(elapsed),
+		// Uncached input is what you pay full rate for; the cached half is the
+		// whole reason a persistent agent beats a fresh one.
+		digest.cachedTokens
+			? `in=${humanTokens(digest.inputTokens)}+${humanTokens(digest.cachedTokens)} cached (${hit}%)`
+			: `in=${humanTokens(digest.inputTokens)}`,
+		`out=${humanTokens(digest.outputTokens)}`
+	];
+	if (digest.retries) parts.push(`retries=${digest.retries}`);
+	if (digest.compactions) parts.push(`compacted=${digest.compactions}`);
+	if (digest.cost > 0) parts.push(`$${digest.cost.toFixed(4)}`);
+
+	out(`[${options.label ?? meta.id}] ${digest.status.toUpperCase()}  ${parts.join('  ')}  ${meta.model}`);
+
+	if (digest.tools.length) {
+		const rendered = digest.tools
+			.map((tool) => `${tool.failed ? '!' : ''}${tool.name}${tool.hint ? `(${tool.hint})` : ''}`)
+			.join(' · ');
+		out(`tools: ${truncate(rendered, options.full ? 4000 : 300)}`);
+	}
+
+	for (const note of digest.notes.slice(0, 2)) out(`note: ${note}`);
+	for (const error of digest.errors.slice(0, 3)) out(`error: ${error}`);
+
+	if (digest.status === 'interrupted') {
+		out(`note: the detached supervisor ended before ${meta.harness === 'antigravity' ? 'Antigravity' : 'Pi'} recorded a result.`);
+		out('      Inspect the event log, then retry the task.');
+	}
+
+	if (digest.status === 'empty' || digest.status === 'failed') {
+		const upstream = meta.apiMode !== 'bundled-proxy'
+			? []
+			: proxyErrorsBetween(meta.startedAt, meta.finishedAt ?? Date.now());
+		for (const line of upstream) out(`upstream: ${line}`);
+		if (digest.status === 'empty' && !upstream.length) {
+			out(
+				meta.apiMode !== 'bundled-proxy'
+					? `note: the ${meta.harness === 'antigravity' ? 'Antigravity' : 'direct API'} run produced no assistant content.`
+					: 'note: the run produced no assistant content and nothing was logged upstream.'
+			);
+		}
+	}
+
+	out(`events: ${resolve(jobDir(meta.id), 'events.jsonl')}`);
+
+	if (digest.text) {
+		out('---');
+		out(options.full ? digest.text : truncate(digest.text, 2000));
+	}
+}
+
+interface LiveProgress {
+	generatedTokens: number;
+	lastTenSecondsTokens: number;
+	lastTenSecondsTps: number;
+	waitingForFirstToken: boolean;
+}
+
+function liveProgress(id: string, meta: JobMeta): LiveProgress {
+	const eventsPath = resolve(jobDir(id), 'events.jsonl');
+	if (!existsSync(eventsPath)) {
+		return {
+			generatedTokens: 0,
+			lastTenSecondsTokens: 0,
+			lastTenSecondsTps: 0,
+			waitingForFirstToken: true
+		};
+	}
+
+	let completedTokens = 0;
+	let currentText = '';
+	let recentText = '';
+	let sawGeneratedDelta = false;
+	const now = Date.now();
+	const recentCutoff = now - 10_000;
+	for (const line of readFileSync(eventsPath, 'utf8').split(/\r?\n/)) {
+		if (!line.trim()) continue;
+		let event: Record<string, unknown>;
+		try {
+			event = JSON.parse(line) as Record<string, unknown>;
+		} catch {
+			continue;
+		}
+		const type = String(event.type ?? '');
+		if (meta.harness === 'antigravity') {
+			const step = event.event === 'step_update' && isRecord(event.step_update) ? event.step_update : null;
+			const delta = typeof step?.text_delta === 'string' ? step.text_delta : '';
+			if (step?.step_type === 'agent_response' && delta) {
+				sawGeneratedDelta = true;
+				currentText += delta;
+				if (Number(event._pirun_received_at) >= recentCutoff) recentText += delta;
+			}
+			if (event.event === 'result' && isRecord(event.result)) {
+				const usage = isRecord(event.result.usage) ? event.result.usage : null;
+				completedTokens = Number(usage?.output_tokens ?? completedTokens) + Number(usage?.thinking_tokens ?? 0);
+				currentText = '';
+			}
+			continue;
+		}
+		const message = isRecord(event.message) ? event.message : null;
+		if (type === 'message_start' && message?.role === 'assistant') currentText = '';
+		if (type === 'message_update') {
+			const update = isRecord(event.assistantMessageEvent) ? event.assistantMessageEvent : null;
+			const updateType = String(update?.type ?? '');
+			const delta = typeof update?.delta === 'string' ? update.delta : '';
+			if (delta && ['thinking_delta', 'text_delta', 'toolcall_delta'].includes(updateType)) {
+				sawGeneratedDelta = true;
+				currentText += delta;
+				if (Number(event._pirun_received_at) >= recentCutoff) recentText += delta;
+			}
+		}
+		if (type === 'message_end' && message?.role === 'assistant') {
+			const usage = isRecord(message.usage) ? message.usage : null;
+			completedTokens += Number(usage?.output ?? 0);
+			currentText = '';
+		}
+	}
+
+	const generatedTokens = completedTokens + (currentText ? encode(currentText).length : 0);
+	const recentTokens = recentText ? encode(recentText).length : 0;
+	const observedWindowSeconds = Math.max(1, Math.min(10, (now - meta.startedAt) / 1000));
+	return {
+		generatedTokens,
+		lastTenSecondsTokens: recentTokens,
+		lastTenSecondsTps: recentTokens / observedWindowSeconds,
+		waitingForFirstToken: !sawGeneratedDelta
+	};
+}
+
+export function emitRunningHandoff(meta: JobMeta, digest: Digest, args: Args) {
+	const progress = liveProgress(meta.id, meta);
+	const hardDeadline = meta.deadlineAt ?? (meta.piStartedAt ?? meta.startedAt) + meta.timeoutSec * 1000;
+	const hardRemaining = Math.max(0, hardDeadline - Date.now());
+	if (args.flags.has('json')) {
+		out(JSON.stringify({ meta, digest, progress, hardRemainingMs: hardRemaining }, null, 2));
+		return;
+	}
+	const label = meta.label ?? meta.id;
+	out(
+		`[${label}] RUNNING  turns=${digest.turns}  ${humanDuration(Date.now() - meta.startedAt)}  ` +
+			`generated≈${humanTokens(progress.generatedTokens)}  last-10s=${progress.lastTenSecondsTps.toFixed(2)} tok/s`
+	);
+	if (progress.waitingForFirstToken) out('state: waiting for first generated token');
+	out(`${meta.harness === 'antigravity' ? 'Antigravity' : 'Pi'} continues in the background; hard stop in ${humanDuration(hardRemaining)}.`);
+	const preset = meta.preset ?? state.presetName;
+	out(
+		`check: pirun wait ${preset} ${meta.id}   ` +
+			`progress: pirun poll ${preset} ${meta.id}   stop: pirun kill ${preset} ${meta.id}`
+	);
+}
+
+export function emit(meta: JobMeta, digest: Digest, args: Args, label?: string) {
+	if (args.flags.has('json')) out(JSON.stringify({ meta, digest }, null, 2));
+	else renderDigest(meta, digest, { full: args.flags.has('full'), label });
+}
