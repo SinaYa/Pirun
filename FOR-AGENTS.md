@@ -14,9 +14,11 @@ supplied on any launch persist into the preset; omitted ones load from it.
 Prompts and `--time` never persist. There is no setup command.
 
 ```powershell
-pirun agent local worker --time 10m/2h --model <model-id> --file C:\path\task.md
+pirun agent local worker --time 10m/2h --use <provider[/account]> --model <model-id> --file C:\path\task.md
 pirun agent local worker --time 10m/2h "Continue: address the review notes"
 ```
+
+The first launch of a preset must name `--use`; after that it persists.
 
 A named agent remembers its prior turns; reuse one name per subsystem so the
 provider caches the prefix. `pirun run <preset> …` is one-shot with no memory.
