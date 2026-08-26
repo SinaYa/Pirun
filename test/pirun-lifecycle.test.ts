@@ -1,23 +1,28 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 
 const projectDir = resolve(import.meta.dirname, '..');
 const pirunEntry = resolve(projectDir, 'bin', 'pirun.ts');
 const fakePiEntry = resolve(import.meta.dirname, 'fixtures', 'fake-pi.mjs');
-const runsDir = resolve(projectDir, '.runs');
 const testPreset = `lifecycle-${randomBytes(4).toString('hex')}`;
-// The preset points at a canonical endpoint with a fake key; the Pi registry
-// and Pi settings land in an isolated home, and the harness itself is fake-pi.
-const testHome = resolve(runsDir, `${testPreset}-home`);
+// Fully isolated: own runs dir, config, providers store, and home (Pi registry
+// and Pi settings). The harness itself is fake-pi with a fake endpoint key.
+const sandbox = resolve(tmpdir(), `pirun-${testPreset}`);
+const runsDir = resolve(sandbox, 'runs');
+const testHome = resolve(sandbox, 'home');
+mkdirSync(runsDir, { recursive: true });
+after(() => rmSync(sandbox, { recursive: true, force: true }));
 const testEnv = {
 	...process.env,
 	PIRUN_PI_ENTRY: fakePiEntry,
-	PIRUN_CONFIG_PATH: resolve(runsDir, `${testPreset}.json`),
-	PIRUN_PROVIDERS_PATH: resolve(runsDir, `${testPreset}-providers.json`),
+	PIRUN_RUNS_DIR: runsDir,
+	PIRUN_CONFIG_PATH: resolve(sandbox, 'pirun.json'),
+	PIRUN_PROVIDERS_PATH: resolve(sandbox, 'providers.json'),
 	HOME: testHome,
 	USERPROFILE: testHome,
 	DEEPSEEK_API_KEY: 'sk-offline-test',

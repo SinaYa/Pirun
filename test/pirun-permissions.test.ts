@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { after, test } from 'node:test';
 
 process.env.PIRUN_PROVIDERS_PATH = resolve(tmpdir(), 'pirun-permissions-test-providers.json');
+process.env.PIRUN_RUNS_DIR = resolve(tmpdir(), 'pirun-permissions-test-runs');
 const {
 	antigravityPermissionArgs,
 	assertPermissionCoverage,

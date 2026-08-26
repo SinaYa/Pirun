@@ -8,6 +8,7 @@ import { after, test } from 'node:test';
 // Offline: the login dialog is exercised with an in-process fake agy child and
 // a temp profile directory. No OAuth, no browser, no real harness.
 process.env.PIRUN_PROVIDERS_PATH = resolve(tmpdir(), 'pirun-login-test-providers.json');
+process.env.PIRUN_RUNS_DIR = resolve(tmpdir(), 'pirun-login-test-runs');
 const { runAntigravityLoginDialog } = await import('../src/cli/auth.ts');
 
 const sandbox = mkdtempSync(resolve(tmpdir(), 'pirun-login-'));

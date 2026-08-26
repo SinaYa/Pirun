@@ -9,27 +9,17 @@ import {
 	writeFileSync
 } from 'node:fs';
 import { resolve } from 'node:path';
+import { pirunStateRoot } from './paths.ts';
 
 const FILE_STORAGE_PATTERN = /Using file-based token storage/i;
 const KEYRING_PATTERN = /authenticated via keyring|Using keyring token storage/i;
 const AUTH_SUCCESS_PATTERN = /OAuth: authenticated successfully as|Print mode: silent auth succeeded/i;
 const INELIGIBLE_PATTERN = /Account ineligible|not eligible for Antigravity/i;
 
-function stateRoot() {
-	if (process.env.PIRUN_STATE_DIR) return resolve(process.env.PIRUN_STATE_DIR);
-	if (process.platform === 'win32' && process.env.LOCALAPPDATA) {
-		return resolve(process.env.LOCALAPPDATA, 'Pirun');
-	}
-	if (process.env.XDG_STATE_HOME) return resolve(process.env.XDG_STATE_HOME, 'pirun');
-	const home = process.env.HOME || process.env.USERPROFILE;
-	if (!home) throw new Error('No user state directory is available for an isolated Antigravity profile.');
-	return resolve(home, '.local', 'state', 'pirun');
-}
-
 export function antigravityProfileDir(presetName: string) {
 	const safe = presetName.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'preset';
 	const hash = createHash('sha256').update(presetName).digest('hex').slice(0, 8);
-	return resolve(stateRoot(), 'profiles', `${safe.slice(0, 40)}-${hash}`, 'antigravity');
+	return resolve(pirunStateRoot(), 'profiles', `${safe.slice(0, 40)}-${hash}`, 'antigravity');
 }
 
 export function ensureAntigravityProfile(profileDir: string) {

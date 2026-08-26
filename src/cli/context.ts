@@ -4,10 +4,10 @@
  * import any other `src/cli/*` module — it is the root of the import graph.
  */
 
-import { existsSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
-import { PROJECT_DIR } from '../paths.ts';
+import { pirunStateRoot, PROJECT_DIR } from '../paths.ts';
 import {
 	loadProvidersStore,
 	type ProvidersStore,
@@ -16,7 +16,73 @@ import {
 import { defaultPreset, type PirunConfig, type PirunPreset } from '../pirun-config.ts';
 import { terminateProcessTree } from '../pirun-process.ts';
 
-export const RUNS_DIR = resolve(PROJECT_DIR, '.runs');
+/**
+ * Runs and presets live in the machine-global state home, never in the repo.
+ * Legacy state (repo-local .runs/ and pirun.json from earlier versions) is
+ * migrated once, and only while no run in it is still live.
+ */
+function hasLiveRun(runsDir: string) {
+	try {
+		for (const entry of readdirSync(runsDir)) {
+			const metaPath = resolve(runsDir, entry, 'meta.json');
+			if (!existsSync(metaPath)) continue;
+			try {
+				const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as {
+					finishedAt?: number;
+					pid?: number;
+					supervisorPid?: number;
+				};
+				const pid = meta.supervisorPid ?? meta.pid;
+				if (!meta.finishedAt && pid && isAlive(pid)) return true;
+			} catch {
+				/* an unreadable meta is not a live run */
+			}
+		}
+	} catch {
+		/* a missing or unreadable dir has no live runs */
+	}
+	return false;
+}
+
+function migrateLegacyTree(legacy: string, target: string) {
+	if (!existsSync(legacy) || existsSync(target)) return;
+	try {
+		mkdirSync(resolve(target, '..'), { recursive: true });
+		renameSync(legacy, target); // same-volume: instant
+	} catch {
+		try {
+			cpSync(legacy, target, { recursive: true }); // cross-volume fallback
+			rmSync(legacy, { recursive: true, force: true });
+		} catch {
+			rmSync(target, { recursive: true, force: true }); // half-copies must not win
+		}
+	}
+}
+
+/** Migration may only fire from a real CLI invocation, never a bare import. */
+const CLI_INVOKED = /[\\/]bin[\\/](pirun|install)\.ts$/.test(process.argv[1] ?? '');
+
+function resolveRunsDir() {
+	if (process.env.PIRUN_RUNS_DIR) return resolve(process.env.PIRUN_RUNS_DIR);
+	const target = resolve(pirunStateRoot(), 'runs');
+	const legacy = resolve(PROJECT_DIR, '.runs');
+	if (existsSync(legacy)) {
+		if (!CLI_INVOKED || hasLiveRun(legacy)) return legacy; // migrate on a later, quiet invocation
+		migrateLegacyTree(legacy, target);
+		if (existsSync(legacy)) return legacy; // migration declined or failed
+	}
+	return target;
+}
+
+function resolvePirunConfig() {
+	if (process.env.PIRUN_CONFIG_PATH) return resolve(process.env.PIRUN_CONFIG_PATH);
+	const target = resolve(pirunStateRoot(), 'pirun.json');
+	const legacy = resolve(PROJECT_DIR, 'pirun.json');
+	if (CLI_INVOKED) migrateLegacyTree(legacy, target);
+	return existsSync(legacy) ? legacy : target;
+}
+
+export const RUNS_DIR = resolveRunsDir();
 export const AGENTS_DIR = resolve(RUNS_DIR, 'agents');
 /**
  * Every agent's Pi session lives in one directory. Pi resolves `--session-id`
@@ -28,9 +94,7 @@ export const PIRUN_ENTRY = resolve(PROJECT_DIR, 'bin', 'pirun.ts');
 export const RETENTION_DAYS = positiveEnvNumber('PIRUN_RETENTION_DAYS', 30);
 export const MAX_STORAGE_BYTES = positiveEnvNumber('PIRUN_MAX_STORAGE_MB', 1024) * 1024 * 1024;
 
-export const PIRUN_CONFIG = process.env.PIRUN_CONFIG_PATH
-	? resolve(process.env.PIRUN_CONFIG_PATH)
-	: resolve(PROJECT_DIR, 'pirun.json');
+export const PIRUN_CONFIG = resolvePirunConfig();
 
 /** Mutable CLI-wide state, populated by configurePreset before dispatch. */
 export const state = {

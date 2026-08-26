@@ -17,6 +17,7 @@ const testEnv = {
 	...process.env,
 	PIRUN_CONFIG_PATH: resolve(sandbox, 'config.json'),
 	PIRUN_PROVIDERS_PATH: resolve(sandbox, 'providers.json'),
+	PIRUN_RUNS_DIR: resolve(sandbox, 'runs'),
 	HOME: sandbox,
 	USERPROFILE: sandbox,
 	DEEPSEEK_API_KEY: 'sk-offline-test',
