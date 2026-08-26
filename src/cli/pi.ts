@@ -1,10 +1,9 @@
-/** Pi CLI discovery and the bundled-proxy model catalogue. */
+/** Pi CLI discovery and its registered-model catalogue. */
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { getModelDefaults } from '../inference-provider-config.ts';
-import { die, state } from './context.ts';
+import { die } from './context.ts';
 
 /** Flags that keep Pi from scanning disk and injecting things nobody asked for. */
 export const LEAN_FLAGS = [
@@ -99,71 +98,22 @@ export function knownPiModels(): PiModelRow[] {
 	}
 }
 
-/**
- * `cladgpt-proxy/commandcode.ox-alpha` splits into a provider part, a
- * provider-qualified part (`commandcode.ox-alpha`) and a bare name
- * (`ox-alpha`). Matching only ever looks at the last two — the Pi provider name
- * and the human labels both contain "proxy", so matching the whole string makes
- * half the alphabet ambiguous.
- */
-export function modelParts(id: string) {
-	const qualified = id.slice(id.indexOf('/') + 1);
-	const dot = qualified.indexOf('.');
-	return { qualified, bare: dot === -1 ? qualified : qualified.slice(dot + 1) };
-}
-
 export interface CatalogueRow {
 	id: string;
 	name: string;
-	canonical: string;
 	contextWindow: number;
 	maxTokens: number;
 	reasoning: boolean;
-	defaults: Record<string, unknown> | null;
 }
 
-/**
- * What Pi can address, enriched with the tuned per-model defaults this project
- * applies on the way out. The defaults are not something Pi knows about — they
- * are filled in downstream — so this is the only place both halves meet.
- */
+/** Everything Pi can address, straight from its models.json. */
 export function catalogue(): CatalogueRow[] {
-	return knownPiModels().map((model) => {
-		const canonical = modelParts(model.id).bare;
-		return {
-			id: model.id,
-			name: model.name,
-			canonical,
-			contextWindow: model.contextWindow,
-			maxTokens: model.maxTokens,
-			reasoning: model.reasoning,
-			defaults: getModelDefaults(canonical)
-		};
-	});
+	return knownPiModels().map((model) => ({
+		id: model.id,
+		name: model.name,
+		contextWindow: model.contextWindow,
+		maxTokens: model.maxTokens,
+		reasoning: model.reasoning
+	}));
 }
 
-/** Accepts a full `provider/id`, a `provider.model`, a bare name, or a fragment. */
-export function resolveProxyModel(input: string) {
-	if (!input) return state.defaultModel;
-	const models = knownPiModels().filter((model) => model.provider === 'cladgpt-proxy');
-	if (!models.length) return input;
-
-	const needle = input.toLowerCase();
-	const tiers: Array<(model: { id: string }) => boolean> = [
-		(model) => model.id.toLowerCase() === needle,
-		(model) => modelParts(model.id).qualified.toLowerCase() === needle,
-		(model) => modelParts(model.id).bare.toLowerCase() === needle,
-		(model) => modelParts(model.id).qualified.toLowerCase().includes(needle)
-	];
-
-	for (const matches of tiers.map((predicate) => models.filter(predicate))) {
-		if (matches.length === 1) return matches[0].id;
-		if (matches.length > 1) {
-			die(
-				`"${input}" matches ${matches.length} models:\n  ${matches.map((m) => m.id).join('\n  ')}\n` +
-					'Use a longer fragment, or name the provider (e.g. "deepseek.deepseek-v4-flash").'
-			);
-		}
-	}
-	return input;
-}

@@ -52,6 +52,7 @@ test('--use errors name the exact fixing command', () => {
 	assert.throws(() => resolveUse(emptyStore(), 'deepseek/nope'), /pirun provider key deepseek nope/);
 	assert.throws(() => resolveUse(emptyStore(), 'antigravity'), /pirun login antigravity/);
 	assert.throws(() => resolveUse(emptyStore(), 'not-a-thing'), /pirun provider add not-a-thing/);
+	assert.throws(() => resolveUse(emptyStore(), 'bundled'), /bundled proxy was removed[\s\S]*pirun provider add/);
 });
 
 test('harness accounts resolve by name and default to the only account', () => {
@@ -113,7 +114,8 @@ test('v1 presets migrate into the shared store without losing authentication', (
 	assert.equal(config.presets.openai.use, 'openai/main');
 	assert.equal(config.presets.openai.api, undefined);
 	assert.equal(store.endpoints.openai.accounts.main.key, '$OPENAI_API_KEY');
-	assert.equal(config.presets.local.use, 'bundled');
+	// A sourceless preset stays empty; the next launch demands --use.
+	assert.equal(config.presets.local.use, '');
 	// A second pass changes nothing further.
 	const again = migratePresetsToProviders(config, store);
 	assert.equal(again.configChanged, false);

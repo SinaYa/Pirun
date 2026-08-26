@@ -8,7 +8,6 @@ import {
 } from '../pirun-config.ts';
 import {
 	accountEnvVar,
-	BUNDLED_PROVIDER,
 	CANONICAL_ENDPOINTS,
 	catalogModel,
 	detectedEnvAccounts,
@@ -24,9 +23,7 @@ import {
 } from '../pirun-providers.ts';
 import { hasAntigravityAuthMarker } from '../pirun-antigravity.ts';
 import {
-	BASE_URL,
 	die,
-	FALLBACK_MODEL,
 	humanTokens,
 	out,
 	PIRUN_CONFIG,
@@ -86,14 +83,13 @@ function providerRows() {
 			login: `pirun login ${name} <account>`
 		});
 	}
-	rows.push({ name: BUNDLED_PROVIDER, kind: 'bundled', canonical: true, baseUrl: `${BASE_URL}/v1`, accounts: [] });
 	return rows;
 }
 
 export function commandProviders(args: Args) {
 	const presetUses: Record<string, string> = {};
 	try {
-		const loaded = loadPirunConfig(PIRUN_CONFIG, FALLBACK_MODEL);
+		const loaded = loadPirunConfig(PIRUN_CONFIG);
 		migratePresetsToProviders(loaded.config, state.providersStore);
 		for (const [name, preset] of Object.entries(loaded.config.presets)) presetUses[name] = preset.use;
 	} catch {
@@ -107,9 +103,7 @@ export function commandProviders(args: Args) {
 	for (const row of rows) {
 		const accounts = row.accounts as Array<{ account: string; key: string; ready: boolean }>;
 		const detected = (row.detected as Array<{ account: string; envVar: string }> | undefined) ?? [];
-		const headline = row.kind === 'bundled'
-			? `${String(row.name).padEnd(12)} bundled proxy  ${row.baseUrl}`
-			: `${String(row.name).padEnd(12)} ${row.kind}${row.canonical ? '' : ' (custom)'}  ${row.baseUrl ?? ''}`;
+		const headline = `${String(row.name).padEnd(12)} ${row.kind}${row.canonical ? '' : ' (custom)'}  ${row.baseUrl ?? ''}`;
 		out(headline.trimEnd());
 		for (const account of accounts) {
 			const mark = account.account === row.defaultAccount && accounts.length > 1 ? '*' : ' ';

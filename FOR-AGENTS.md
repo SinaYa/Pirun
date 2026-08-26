@@ -3,7 +3,7 @@
 Use **`pirun`**, never a harness CLI directly. Setup if missing:
 
 ```powershell
-node D:\projectx\CladGPT\completions-proxy\bin\install.ts
+node D:\projectx\pirun\bin\install.ts
 ```
 
 ## Grammar
@@ -32,10 +32,12 @@ returns every provider, account, readiness, and model in one call — everything
 
 | Source | Select with | Accounts come from |
 |---|---|---|
-| bundled proxy (default) | `--use bundled` | none needed |
 | known endpoints: openai, deepseek, openrouter, groq, mistral, xai | `--use deepseek[/work]` | `DEEPSEEK_API_KEY` auto-creates `main`; `DEEPSEEK_API_KEY_WORK` auto-creates `work`; else `pirun provider key deepseek work --env VAR` |
-| custom endpoint | `--use myapi[/acct]` | `pirun provider add myapi --base-url <url>`, then `provider key` |
+| custom endpoint (a local proxy included) | `--use myapi[/acct]` | `pirun provider add myapi --base-url <url>`, then `provider key` |
 | Antigravity harness | `--use antigravity/<account>` | `pirun login antigravity <account>` — opens a visible console window; the human completes the browser sign-in and pastes the code there |
+
+A fresh preset has no provider: its first launch must include `--use` (the
+error names the exact flag). There is no default provider.
 
 `pirun spend [provider[/account]] [--json]` is the one consumption interface:
 endpoint accounts answer with credits/balance; Antigravity accounts answer with
@@ -134,7 +136,7 @@ Do not spend a run on a smoke test first; run the actual task.
 - `EMPTY` — provider ended without an answer; retry. Not a capability verdict.
 - `TIMEOUT` — it ran past your something-is-wrong threshold. Inspect the log
   before retrying; do not just retry with a bigger number.
-- `FAILED` — read the `error:` and `upstream:` lines.
+- `FAILED` — read the `error:` lines; they carry the provider's own message.
 - `INTERRUPTED` — supervision died; inspect `pirun log <preset> <id>`.
 
 Transient provider failures retry automatically (five turn retries unless a

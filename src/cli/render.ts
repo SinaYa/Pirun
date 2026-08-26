@@ -5,7 +5,6 @@ import { resolve } from 'node:path';
 import { encode } from 'gpt-tokenizer';
 import type { PirunArgs as Args } from '../pirun-args.ts';
 import { humanDuration, humanTokens, isRecord, out, state, truncate } from './context.ts';
-import { proxyErrorsBetween } from './proxy.ts';
 import { jobDir, type JobMeta } from './store.ts';
 import type { Digest } from './digest.ts';
 
@@ -44,18 +43,8 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 		out('      Inspect the event log, then retry the task.');
 	}
 
-	if (digest.status === 'empty' || digest.status === 'failed') {
-		const upstream = meta.apiMode !== 'bundled-proxy'
-			? []
-			: proxyErrorsBetween(meta.startedAt, meta.finishedAt ?? Date.now());
-		for (const line of upstream) out(`upstream: ${line}`);
-		if (digest.status === 'empty' && !upstream.length) {
-			out(
-				meta.apiMode !== 'bundled-proxy'
-					? `note: the ${meta.harness === 'antigravity' ? 'Antigravity' : 'direct API'} run produced no assistant content.`
-					: 'note: the run produced no assistant content and nothing was logged upstream.'
-			);
-		}
+	if (digest.status === 'empty') {
+		out(`note: the ${meta.harness === 'antigravity' ? 'Antigravity' : 'direct API'} run produced no assistant content.`);
 	}
 
 	out(`events: ${resolve(jobDir(meta.id), 'events.jsonl')}`);

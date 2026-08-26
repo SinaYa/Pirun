@@ -30,7 +30,7 @@ test('pirun rejects typos and missing option values', () => {
 test('v1 options are rejected with a pointer to their replacement', () => {
 	assert.throws(() => parsePirunArgs(['run', '--timeout', '60', 'task']), /--time <return-after>\/<timeout>/);
 	assert.throws(() => parsePirunArgs(['run', '--api-base-url', 'https://x/v1', 'task']), /provider add/);
-	assert.throws(() => parsePirunArgs(['agent', 'w', '--bundled-proxy', 'task']), /--use bundled/);
+	assert.throws(() => parsePirunArgs(['agent', 'w', '--bundled-proxy', 'task']), /bundled proxy was removed.*provider add/);
 });
 
 test('double dash allows a task beginning with an option-like token', () => {

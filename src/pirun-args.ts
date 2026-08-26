@@ -74,9 +74,6 @@ const ALLOWED_FLAGS: Record<string, Set<string>> = {
 	provider: PROVIDER_FLAGS,
 	spend: new Set(['json']),
 	config: new Set(),
-	up: new Set(),
-	down: new Set(),
-	restart: new Set(),
 	help: new Set(),
 	'--help': new Set(),
 	'-h': new Set()
@@ -112,7 +109,7 @@ const MOVED_FLAGS: Record<string, string> = {
 	'api-base-url': 'endpoints live in the shared provider store now: pirun provider add <name> --base-url <url>, then --use <name>',
 	'api-key': 'api keys live in the shared provider store now: pirun provider key <provider> <account> --key <value>, then --use <provider>/<account>',
 	'api-key-env': 'api keys live in the shared provider store now: pirun provider key <provider> <account> --env <VAR>, then --use <provider>/<account>',
-	'bundled-proxy': 'select the bundled proxy with --use bundled',
+	'bundled-proxy': 'the bundled proxy was removed; register a proxy as an endpoint (pirun provider add <name> --base-url <url>) and select it with --use <name>',
 	'auth-header': 'API compatibility moved to the provider: pirun provider set <name> --auth-header',
 	'no-auth-header': 'API compatibility moved to the provider: pirun provider set <name> --no-auth-header',
 	'developer-role': 'API compatibility moved to the provider: pirun provider set <name> --developer-role',
@@ -133,13 +130,7 @@ export function parsePirunArgs(argv: string[]): PirunArgs {
 	const allowed = ALLOWED_FLAGS[command];
 	let positionalOnly = false;
 
-	// speedtest owns its richer option grammar. Its first positional token is
-	// still Pirun's preset; every token after that is forwarded unchanged.
-	const validate = command !== 'speedtest';
-	if (!validate) {
-		return { command, positional: argv.slice(1), flags };
-	}
-	if (validate && !allowed) return { command, positional: argv.slice(1), flags };
+	if (!allowed) return { command, positional: argv.slice(1), flags };
 
 	const presetFlagsApply = !PROVIDER_COMMANDS.has(command);
 	for (let index = 1; index < argv.length; index += 1) {
@@ -156,7 +147,7 @@ export function parsePirunArgs(argv: string[]): PirunArgs {
 		const raw = token.slice(2);
 		const at = raw.indexOf('=');
 		const name = at === -1 ? raw : raw.slice(0, at);
-		if (validate && !allowed?.has(name) && !(presetFlagsApply && PRESET_FLAGS.has(name))) {
+		if (!allowed.has(name) && !(presetFlagsApply && PRESET_FLAGS.has(name))) {
 			if (presetFlagsApply && MOVED_FLAGS[name]) {
 				throw new Error(`option "--${name}" moved: ${MOVED_FLAGS[name]}`);
 			}

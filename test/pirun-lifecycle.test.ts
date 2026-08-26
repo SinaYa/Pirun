@@ -10,22 +10,31 @@ const pirunEntry = resolve(projectDir, 'bin', 'pirun.ts');
 const fakePiEntry = resolve(import.meta.dirname, 'fixtures', 'fake-pi.mjs');
 const runsDir = resolve(projectDir, '.runs');
 const testPreset = `lifecycle-${randomBytes(4).toString('hex')}`;
+// The preset points at a canonical endpoint with a fake key; the Pi registry
+// and Pi settings land in an isolated home, and the harness itself is fake-pi.
+const testHome = resolve(runsDir, `${testPreset}-home`);
 const testEnv = {
 	...process.env,
 	PIRUN_PI_ENTRY: fakePiEntry,
-	PIRUN_SKIP_PROXY: '1',
 	PIRUN_CONFIG_PATH: resolve(runsDir, `${testPreset}.json`),
 	PIRUN_PROVIDERS_PATH: resolve(runsDir, `${testPreset}-providers.json`),
+	HOME: testHome,
+	USERPROFILE: testHome,
+	DEEPSEEK_API_KEY: 'sk-offline-test',
 	NO_COLOR: '1'
 };
 
 function pirun(args: string[], timeout = 15_000) {
-	return spawnSync(process.execPath, [pirunEntry, args[0], testPreset, ...args.slice(1)], {
-		cwd: projectDir,
-		env: testEnv,
-		encoding: 'utf8',
-		timeout
-	});
+	return spawnSync(
+		process.execPath,
+		[pirunEntry, args[0], testPreset, '--use', 'deepseek', ...args.slice(1)],
+		{
+			cwd: projectDir,
+			env: testEnv,
+			encoding: 'utf8',
+			timeout
+		}
+	);
 }
 
 function runId(result: ReturnType<typeof pirun>) {

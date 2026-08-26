@@ -46,8 +46,6 @@ provider store, not in presets — authenticate once, use from any preset.
                                    the preset's provider's models (--refresh
                                    pulls the live /models list)
   pirun model <preset> [<id>]      show or set the preset's model
-  pirun up|down|restart <preset>   manage the bundled proxy
-  pirun speedtest <preset> [options]
 
 Provider store (shared across presets; no preset argument):
   pirun providers [--json]         every provider, account, and readiness —
@@ -85,7 +83,7 @@ Persistent preset options (accepted by every preset command):
                                    is set (${endpointEnvVar('deepseek')}, or
                                    ${endpointEnvVar('deepseek')}_<ACCOUNT> per account).
                                    Harness accounts: --use antigravity/<account>.
-                                   Bundled proxy: --use bundled.
+                                   Custom endpoints: pirun provider add first.
   --model <id-or-fragment>         resolved against the provider's catalog
   --effort <off|min|low|medium|high|max|Nk>
                                    reasoning intent, mapped per model — safe to
@@ -105,5 +103,5 @@ Later launches load the saved settings:
 
 Exit status: 0 the run produced output, 1 it failed / came back empty / timed
 out, 2 it is still running (poll again). A failed or empty digest carries the
-provider's own error, plus anything the backing service logged alongside it.`);
+provider's own error.`);
 }

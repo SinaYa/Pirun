@@ -1,23 +1,18 @@
-﻿{
+{
 	"name": "pirun",
 	"private": true,
-	"version": "0.1.0",
-	"description": "Local OpenAI-compatible completions proxy with CladGPT inference routing, configured independently of the parent project.",
+	"version": "0.2.0",
+	"description": "Stable front door for delegating work to coding-agent harness CLIs.",
 	"type": "module",
 	"scripts": {
-		"start": "node src/server.ts",
 		"test": "node scripts/max-lines.mjs && node --test test/*.test.ts",
 		"check": "node scripts/check-syntax.mjs && node scripts/max-lines.mjs",
 		"prepare": "node scripts/setup-hooks.mjs",
 		"setup-hooks": "node scripts/setup-hooks.mjs",
-		"routing": "node -e \"fetch('http://127.0.0.1:8899/v1/routing?model=' + (process.argv[1] || '')).then(r => r.text()).then(console.log)\"",
 		"pirun": "node bin/pirun.ts",
-		"speed-test": "node bin/speed-test.ts",
 		"setup": "node bin/install.ts"
 	},
 	"dependencies": {
-		"yaml": "2.9.0",
-		"command-code": "1.32.1",
 		"gpt-tokenizer": "4.0.0"
 	},
 	"engines": {

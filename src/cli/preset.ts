@@ -14,7 +14,6 @@ import {
 	type PirunPreset
 } from '../pirun-config.ts';
 import {
-	BUNDLED_PROVIDER,
 	endpointModels,
 	parseEffortIntent,
 	resolveEndpointModel,
@@ -23,8 +22,8 @@ import {
 } from '../pirun-providers.ts';
 import { parseTimeSpec } from '../pirun-time.ts';
 import { loadEnvFile } from '../env.ts';
-import { die, FALLBACK_MODEL, PIRUN_CONFIG, state } from './context.ts';
-import { piModelsFile, resolveProxyModel } from './pi.ts';
+import { die, PIRUN_CONFIG, state } from './context.ts';
+import { piModelsFile } from './pi.ts';
 
 export function positiveFlagInteger(args: Args, name: string, fallback: number) {
 	const raw = flagString(args, name);
@@ -69,13 +68,10 @@ export function requestedTimeSpec(args: Args) {
 
 export function resolveModel(input: string) {
 	if (state.preset.harness === 'antigravity') return input || state.preset.model || 'auto';
-	if (state.use.kind === 'endpoint') {
-		const id = input
-			? resolveEndpointModel(state.providersStore, state.use.provider, input)
-			: state.preset.model;
-		return `${piProviderIdForUse(state.preset.use)}/${id}`;
-	}
-	return resolveProxyModel(input);
+	const id = input
+		? resolveEndpointModel(state.providersStore, state.use.provider, input)
+		: state.preset.model;
+	return `${piProviderIdForUse(state.preset.use)}/${id}`;
 }
 
 /**
@@ -90,7 +86,7 @@ export function configurePreset(args: Args) {
 
 	let loaded: ReturnType<typeof loadPirunConfig>;
 	try {
-		loaded = loadPirunConfig(PIRUN_CONFIG, FALLBACK_MODEL);
+		loaded = loadPirunConfig(PIRUN_CONFIG);
 	} catch (error) {
 		die(error instanceof Error ? error.message : String(error));
 	}
@@ -98,9 +94,7 @@ export function configurePreset(args: Args) {
 	const migrated = migratePresetsToProviders(loaded.config, state.providersStore);
 	if (migrated.storeChanged) writeProvidersStore(state.providersStore);
 	if (migrated.configChanged) writePirunConfig(PIRUN_CONFIG, loaded.config);
-	const preset: PirunPreset = structuredClone(
-		loaded.config.presets[name] ?? defaultPreset(loaded.legacyModel)
-	);
+	const preset: PirunPreset = structuredClone(loaded.config.presets[name] ?? defaultPreset());
 	loadEnvFile();
 
 	const requestedHarness = flagString(args, 'harness').trim().toLowerCase();
@@ -110,23 +104,26 @@ export function configurePreset(args: Args) {
 	const useRaw = flagString(args, 'use').trim();
 	if (useRaw) preset.use = useRaw;
 	else if (requestedHarness === 'antigravity' && preset.harness !== 'antigravity') preset.use = 'antigravity';
-	else if (requestedHarness === 'pi' && preset.harness === 'antigravity') preset.use = BUNDLED_PROVIDER;
+	else if (requestedHarness === 'pi' && preset.harness === 'antigravity') {
+		die('--harness pi needs an endpoint to talk to; pass --use <provider[/account]> (see: pirun providers).');
+	}
+	if (!preset.use.trim()) {
+		die(`preset "${name}" has no provider; pass --use <provider[/account]> (see: pirun providers).`);
+	}
 
 	try {
-		state.use = resolveUse(state.providersStore, preset.use || BUNDLED_PROVIDER);
+		state.use = resolveUse(state.providersStore, preset.use);
 	} catch (error) {
 		die(error instanceof Error ? error.message : String(error));
 	}
 	if (state.use.created) writeProvidersStore(state.providersStore);
-	preset.use = state.use.kind === 'bundled'
-		? BUNDLED_PROVIDER
-		: `${state.use.provider}/${state.use.account}`;
+	preset.use = `${state.use.provider}/${state.use.account}`;
 	const harness: PirunPreset['harness'] = state.use.kind === 'harness' ? 'antigravity' : 'pi';
 	if (harness !== preset.harness) {
 		preset.harness = harness;
 		// The old model belongs to the old source; reset unless one was named.
 		if (!flagString(args, 'model').trim()) {
-			preset.model = harness === 'antigravity' ? 'auto' : state.use.kind === 'bundled' ? FALLBACK_MODEL : '';
+			preset.model = harness === 'antigravity' ? 'auto' : '';
 		}
 	}
 
@@ -135,9 +132,7 @@ export function configurePreset(args: Args) {
 		try {
 			preset.model = harness === 'antigravity'
 				? model
-				: state.use.kind === 'endpoint'
-					? resolveEndpointModel(state.providersStore, state.use.provider, model)
-					: resolveProxyModel(model);
+				: resolveEndpointModel(state.providersStore, state.use.provider, model);
 		} catch (error) {
 			die(error instanceof Error ? error.message : String(error));
 		}
@@ -188,7 +183,7 @@ export function configurePreset(args: Args) {
 
 	if (preset.harness === 'antigravity') {
 		state.defaultModel = preset.model;
-	} else if (state.use.kind === 'endpoint') {
+	} else {
 		try {
 			const providerId = syncPiEndpointProvider(
 				piModelsFile(),
@@ -200,12 +195,6 @@ export function configurePreset(args: Args) {
 			state.defaultModel = `${providerId}/${preset.model}`;
 		} catch (error) {
 			die(error instanceof Error ? error.message : String(error));
-		}
-	} else {
-		state.defaultModel = resolveProxyModel(preset.model);
-		if (state.defaultModel !== preset.model) {
-			preset.model = state.defaultModel;
-			writePirunConfig(PIRUN_CONFIG, loaded.config);
 		}
 	}
 

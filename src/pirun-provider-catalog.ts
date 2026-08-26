@@ -85,7 +85,6 @@ export const CANONICAL_ENDPOINTS: Record<string, CanonicalEndpoint> = {
 };
 
 export const HARNESS_PROVIDERS = ['antigravity'] as const;
-export const BUNDLED_PROVIDER = 'bundled';
 
 export function validProviderName(name: string) {
 	return /^[a-z0-9][a-z0-9._-]{0,63}$/.test(name);

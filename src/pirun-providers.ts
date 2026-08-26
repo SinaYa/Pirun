@@ -15,11 +15,12 @@ import { resolve } from 'node:path';
 import { atomicWriteJson } from './pirun-files.ts';
 import {
 	accountEnvVar,
-	BUNDLED_PROVIDER,
 	CANONICAL_ENDPOINTS,
 	endpointEnvVar,
 	HARNESS_PROVIDERS,
-	validAccountName
+	validAccountName,
+	type CatalogModel,
+	type EndpointCompat
 } from './pirun-provider-catalog.ts';
 
 /* -------------------------------------------------------------------------- */
@@ -96,12 +97,11 @@ export function writeProvidersStore(store: ProvidersStore, path = providersStore
 /* --use resolution                                                           */
 /* -------------------------------------------------------------------------- */
 
-export type UseKind = 'endpoint' | 'harness' | 'bundled';
+export type UseKind = 'endpoint' | 'harness';
 
 export interface ResolvedUse {
 	kind: UseKind;
 	provider: string;
-	/** Empty for the bundled proxy. */
 	account: string;
 	/** True when the account was created during this resolution and the store must be saved. */
 	created: boolean;
@@ -109,7 +109,6 @@ export interface ResolvedUse {
 
 export function knownProviderNames(store: ProvidersStore) {
 	return [
-		BUNDLED_PROVIDER,
 		...HARNESS_PROVIDERS,
 		...new Set([...Object.keys(CANONICAL_ENDPOINTS), ...Object.keys(store.endpoints)])
 	];
@@ -174,9 +173,9 @@ function pickHarnessAccount(store: ProvidersStore, provider: string, requested: 
 }
 
 /**
- * `deepseek`, `deepseek/work`, `antigravity/luigi`, `bundled`. Mutates the
- * store when an account is auto-created (from a detected env var, or a fresh
- * harness account awaiting login) — check `created` and persist.
+ * `deepseek`, `deepseek/work`, `antigravity/luigi`. Mutates the store when an
+ * account is auto-created (from a detected env var, or a fresh harness account
+ * awaiting login) — check `created` and persist.
  */
 export function resolveUse(store: ProvidersStore, raw: string): ResolvedUse {
 	const [providerRaw, accountRaw = '', ...extra] = raw.trim().split('/');
@@ -184,9 +183,11 @@ export function resolveUse(store: ProvidersStore, raw: string): ResolvedUse {
 	if (!provider || extra.length) {
 		throw new Error(`--use takes provider[/account] (got "${raw}"). See: pirun providers`);
 	}
-	if (provider === BUNDLED_PROVIDER) {
-		if (accountRaw) throw new Error('the bundled proxy has no accounts; use just --use bundled.');
-		return { kind: 'bundled', provider, account: '', created: false };
+	if (provider === 'bundled') {
+		throw new Error(
+			'the bundled proxy was removed; a proxy is just another endpoint now.\n' +
+				'register it: pirun provider add <name> --base-url <url>   then: --use <name>'
+		);
 	}
 	if ((HARNESS_PROVIDERS as readonly string[]).includes(provider)) {
 		const picked = pickHarnessAccount(store, provider, accountRaw);

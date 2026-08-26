@@ -22,7 +22,6 @@ import {
 } from '../pirun-antigravity.ts';
 import { fetchEndpointModels, resolveAccountKey } from '../pirun-provider-net.ts';
 import {
-	BASE_URL,
 	die,
 	humanTokens,
 	isAlive,
@@ -33,20 +32,16 @@ import {
 	state,
 	truncate
 } from './context.ts';
-import { catalogue, knownPiModels, modelParts, PI_CANDIDATES, piModelsFile, resolveProxyModel } from './pi.ts';
+import { knownPiModels, PI_CANDIDATES, piModelsFile } from './pi.ts';
 import { resolveModel } from './preset.ts';
-import { proxyIsUp } from './proxy.ts';
 import { jobDir, listAgents, presetJobs, readPresetJob, removeOrphanSessions } from './store.ts';
 import { buildDigest } from './digest.ts';
 import { finaliseIfExited } from './spawn.ts';
 import { antigravityAccountProfileDir } from './auth.ts';
 
 export async function commandStatus() {
-	const usesProxy = state.use.kind === 'bundled';
-	const up = usesProxy ? await proxyIsUp() : false;
 	out(`preset  ${state.presetName}`);
-	out(`use     ${state.preset.use}`);
-	out(`service ${usesProxy ? (up ? 'ready' : 'stopped') : `not used (${state.preset.harness === 'antigravity' ? 'Antigravity account' : 'direct OpenAI completions API'})`}`);
+	out(`use     ${state.preset.use}  (${state.preset.harness === 'antigravity' ? 'Antigravity account' : 'OpenAI completions endpoint'})`);
 	if (state.preset.harness === 'antigravity') {
 		let entry = '';
 		try { entry = findAntigravityEntry(); } catch { /* shown below */ }
@@ -88,13 +83,11 @@ export function commandConfig() {
 				authenticated: hasAntigravityAuthMarker(antigravityAccountProfileDir(state.use.account)),
 				agent: state.preset.antigravityAgent ?? '(default)'
 			}
-			: state.use.kind === 'endpoint'
-				? {
-					mode: 'openai-completions',
-					baseUrl: endpointBaseUrl(state.providersStore, state.use.provider),
-					account: state.use.account
-				}
-				: { mode: 'bundled-proxy', baseUrl: `${BASE_URL}/v1` },
+			: {
+				mode: 'openai-completions',
+				baseUrl: endpointBaseUrl(state.providersStore, state.use.provider),
+				account: state.use.account
+			},
 		presets: Object.keys(state.config.presets).sort()
 	};
 	if (state.preset.json) out(JSON.stringify(shown, null, 2));
@@ -128,7 +121,7 @@ export async function commandModels(args: Args) {
 			die(error instanceof Error ? error.message : String(error));
 		}
 	}
-	if (state.use.kind === 'endpoint') {
+	{
 		const provider = state.use.provider;
 		if (args.flags.has('refresh')) {
 			try {
@@ -170,74 +163,26 @@ export async function commandModels(args: Args) {
 		}
 		out('');
 		out(`* current. Change with: pirun model ${state.presetName} <id>   refresh: pirun models ${state.presetName} --refresh`);
-		return;
 	}
-	const filter = (args.positional[0] ?? '').toLowerCase();
-	const rows = catalogue().filter(
-		(row) => !filter || modelParts(row.id).qualified.toLowerCase().includes(filter)
-	);
-	if (!rows.length) {
-		out(filter ? `no model matches "${filter}".` : 'no models configured. Run the setup script.');
-		return;
-	}
-	if (args.flags.has('json')) {
-		out(JSON.stringify({ default: state.defaultModel, models: rows }, null, 2));
-		return;
-	}
-
-	out(`${'  model'.padEnd(46)}${'ctx'.padStart(7)}${'out'.padStart(8)}   tuning`);
-	for (const row of rows) {
-		const mark = row.id === state.defaultModel ? '* ' : '  ';
-		const tuning = row.defaults
-			? [
-					row.defaults.temperature !== undefined ? `temp ${row.defaults.temperature}` : '',
-					row.defaults.top_p !== undefined ? `top_p ${row.defaults.top_p}` : '',
-					row.defaults.reasoning_effort ? `think ${row.defaults.reasoning_effort}` : ''
-				]
-					.filter(Boolean)
-					.join(' · ') || 'defaults'
-			: 'defaults';
-		out(
-			`${mark}${modelParts(row.id).qualified.padEnd(44)}` +
-				`${humanTokens(row.contextWindow).padStart(7)}${humanTokens(row.maxTokens).padStart(8)}   ${tuning}`
-		);
-	}
-	out('');
-	out(`* current default. Change it with: pirun model ${state.presetName} <id>`);
 }
 
 export function commandModel(args: Args) {
 	const wanted = args.positional[0];
 	if (!wanted) {
-		const row = catalogue().find((entry) => entry.id === state.defaultModel);
 		out(state.preset.model);
 		out(state.preset.harness === 'antigravity'
 			? `provider: Antigravity account (${state.preset.use})`
-			: state.use.kind === 'endpoint'
-				? `provider: ${state.preset.use} (${endpointBaseUrl(state.providersStore, state.use.provider)})`
-				: 'provider: bundled proxy');
+			: `provider: ${state.preset.use} (${endpointBaseUrl(state.providersStore, state.use.provider)})`);
 		if (state.preset.effort) out(`effort: ${state.preset.effort}`);
-		if (row?.defaults) {
-			const shown = Object.entries(row.defaults)
-				.filter(([key]) => key !== 'source')
-				.map(([key, value]) => `${key}=${value}`)
-				.join(' ');
-			out(`tuning: ${shown || '(interface defaults)'}  [${row.defaults.source}]`);
-		}
 		return;
 	}
 	let resolved = wanted;
 	if (state.preset.harness !== 'antigravity') {
 		try {
-			resolved = state.use.kind === 'endpoint'
-				? resolveEndpointModel(state.providersStore, state.use.provider, wanted)
-				: resolveProxyModel(wanted);
+			resolved = resolveEndpointModel(state.providersStore, state.use.provider, wanted);
 		} catch (error) {
 			die(error instanceof Error ? error.message : String(error));
 		}
-	}
-	if (state.use.kind === 'bundled' && !catalogue().some((row) => row.id === resolved)) {
-		die(`"${wanted}" is not a configured model. Run "pirun models ${state.presetName}" to see the list.`);
 	}
 	state.preset.model = resolved;
 	state.config.presets[state.presetName] = state.preset;

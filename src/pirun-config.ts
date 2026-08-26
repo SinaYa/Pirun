@@ -6,7 +6,6 @@ import {
 	endpointBaseUrl,
 	endpointCompat,
 	endpointModels,
-	BUNDLED_PROVIDER,
 	type CatalogModel,
 	type ProvidersStore
 } from './pirun-providers.ts';
@@ -31,7 +30,7 @@ interface LegacyAntigravityConfig {
 }
 
 export interface PirunPreset {
-	/** `provider/account` in the shared provider store, or `bundled`. */
+	/** `provider/account` in the shared provider store. */
 	use: string;
 	harness: PirunHarness;
 	model: string;
@@ -69,11 +68,11 @@ export function validPresetName(name: string) {
 	return /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name);
 }
 
-export function defaultPreset(model: string): PirunPreset {
+export function defaultPreset(): PirunPreset {
 	return {
-		use: BUNDLED_PROVIDER,
+		use: '',
 		harness: 'pi',
-		model,
+		model: '',
 		tools: true,
 		contextFiles: true,
 		full: false,
@@ -81,7 +80,7 @@ export function defaultPreset(model: string): PirunPreset {
 	};
 }
 
-export function loadPirunConfig(path: string, fallbackModel: string) {
+export function loadPirunConfig(path: string) {
 	let parsed: (Partial<PirunConfig> & LegacyPirunConfig) | undefined;
 	if (existsSync(path)) {
 		try {
@@ -90,24 +89,22 @@ export function loadPirunConfig(path: string, fallbackModel: string) {
 			throw new Error(`Pirun configuration is not valid JSON: ${path} (${String(error)})`);
 		}
 	}
-	const legacyModel = typeof parsed?.defaultModel === 'string' && parsed.defaultModel.trim()
-		? parsed.defaultModel.trim()
-		: fallbackModel;
 	const config: PirunConfig = { version: 2, presets: {} };
 	for (const [name, raw] of Object.entries(parsed?.presets ?? {})) {
 		if (!raw || typeof raw !== 'object') continue;
 		const value = raw as Partial<PirunPreset>;
 		const harness: PirunHarness = value.harness === 'antigravity' ? 'antigravity' : 'pi';
 		const preset: PirunPreset = {
-			...defaultPreset(typeof value.model === 'string' && value.model.trim() ? value.model.trim() : legacyModel),
+			...defaultPreset(),
 			...value,
+			model: typeof value.model === 'string' ? value.model.trim() : '',
 			use: typeof value.use === 'string' && value.use.trim() ? value.use.trim() : '',
 			harness
 		};
 		if (harness === 'antigravity' && !preset.model.trim()) preset.model = 'auto';
 		config.presets[name] = preset;
 	}
-	return { config, legacyModel };
+	return { config };
 }
 
 export function writePirunConfig(path: string, config: PirunConfig) {
@@ -118,8 +115,8 @@ export function writePirunConfig(path: string, config: PirunConfig) {
  * One-time upgrade of v1 presets into the shared provider store. Antigravity
  * presets become harness accounts named after the preset — the derived profile
  * directory is identical, so existing logins keep working with no
- * reauthentication. Direct-API presets become custom endpoints; bundled-proxy
- * presets simply point at `bundled`.
+ * reauthentication. Direct-API presets become custom endpoints. A preset with
+ * no source stays empty; the next launch demands --use.
  */
 export function migratePresetsToProviders(config: PirunConfig, store: ProvidersStore) {
 	let configChanged = false;
@@ -138,8 +135,8 @@ export function migratePresetsToProviders(config: PirunConfig, store: ProvidersS
 			}
 			continue;
 		}
-		configChanged = true;
 		if (preset.harness === 'antigravity') {
+			configChanged = true;
 			const harness = (store.harnesses.antigravity ??= { accounts: {} });
 			if (!harness.accounts[name]) {
 				harness.accounts[name] = {};
@@ -149,6 +146,7 @@ export function migratePresetsToProviders(config: PirunConfig, store: ProvidersS
 			continue;
 		}
 		if (preset.api) {
+			configChanged = true;
 			const providerName = name.toLowerCase();
 			const entry = (store.endpoints[providerName] ??= { accounts: {} });
 			entry.custom = true;
@@ -171,7 +169,6 @@ export function migratePresetsToProviders(config: PirunConfig, store: ProvidersS
 			delete preset.api;
 			continue;
 		}
-		preset.use = BUNDLED_PROVIDER;
 	}
 	return { configChanged, storeChanged };
 }

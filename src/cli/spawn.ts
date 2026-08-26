@@ -15,7 +15,6 @@ import { DEFAULT_RETURN_AFTER_SECONDS } from '../timeouts.ts';
 import { die, ensureRunsDir, isAlive, PIRUN_ENTRY, SESSIONS_DIR, state, truncate } from './context.ts';
 import { findPiEntry, LEAN_FLAGS } from './pi.ts';
 import { requestedTimeSpec, resolveModel } from './preset.ts';
-import { startProxy } from './proxy.ts';
 import {
 	agentLockPath,
 	jobDir,
@@ -50,11 +49,7 @@ export function createJob(args: Args, task: string, agent?: AgentMeta, label?: s
 		id,
 		preset: state.presetName,
 		harness: state.preset.harness,
-		apiMode: state.preset.harness === 'antigravity'
-			? 'antigravity-account'
-			: state.use.kind === 'endpoint'
-				? 'openai-completions'
-				: 'bundled-proxy',
+		apiMode: state.preset.harness === 'antigravity' ? 'antigravity-account' : 'openai-completions',
 		model: agent?.model ?? resolveModel(flagString(args, 'model')),
 		cwd: agent?.cwd ?? resolve(flagString(args, 'dir') || state.preset.dir || process.cwd()),
 		task: truncate(task, 300),
@@ -161,9 +156,6 @@ function captureLines(
 }
 
 async function spawnPi(meta: JobMeta) {
-	// The bypass exists for deterministic lifecycle tests. Normal callers never
-	// set it and still get the self-starting proxy behavior.
-	if (process.env.PIRUN_SKIP_PROXY !== '1' && meta.apiMode !== 'openai-completions') await startProxy();
 	ensurePirunRetryDefault();
 	const eventsPath = resolve(jobDir(meta.id), 'events.jsonl');
 	const task = readFileSync(resolve(jobDir(meta.id), 'task.md'), 'utf8');

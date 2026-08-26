@@ -53,9 +53,9 @@ function emptyDigest(): Digest {
 }
 
 /**
- * Pi surfaces provider failures as `errorMessage` strings that wrap our own
- * JSON envelope: `502: {"message":"…","type":"completions_proxy_error"}`. The
- * caller wants the sentence, not the envelope.
+ * Pi surfaces provider failures as `errorMessage` strings that often wrap a
+ * JSON envelope: `502: {"message":"…","type":"…"}`. The caller wants the
+ * sentence, not the envelope.
  */
 function unwrapErrorMessage(raw: string) {
 	const at = raw.indexOf('{');

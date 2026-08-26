@@ -7,16 +7,19 @@ import { resolve } from 'node:path';
 import { after, test } from 'node:test';
 
 // Characterization tests for the CLI surface: everything here is offline and
-// isolated (own config file, own providers store, no proxy, no harness).
+// isolated (own config file, own providers store, own home directory for the
+// Pi registry, a fake api key — no harness, no network).
 const projectDir = resolve(import.meta.dirname, '..');
 const pirunEntry = resolve(projectDir, 'bin', 'pirun.ts');
 const sandbox = mkdtempSync(resolve(tmpdir(), 'pirun-surface-'));
 const preset = `surface-${randomBytes(3).toString('hex')}`;
 const testEnv = {
 	...process.env,
-	PIRUN_SKIP_PROXY: '1',
 	PIRUN_CONFIG_PATH: resolve(sandbox, 'config.json'),
 	PIRUN_PROVIDERS_PATH: resolve(sandbox, 'providers.json'),
+	HOME: sandbox,
+	USERPROFILE: sandbox,
+	DEEPSEEK_API_KEY: 'sk-offline-test',
 	NO_COLOR: '1'
 };
 
@@ -37,8 +40,21 @@ test('an unknown command fails with a pointer to help', () => {
 	assert.match(result.stderr, /unknown command "badcmd"\. Run "pirun help"\./);
 });
 
+test('a fresh preset without --use is refused with the exact fixing flag', () => {
+	const result = pirun('config', `${preset}-nouse`);
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /has no provider; pass --use <provider\[\/account\]> \(see: pirun providers\)/);
+});
+
+test('the removed bundled proxy gets a targeted migration error', () => {
+	const result = pirun('config', `${preset}-legacy`, '--use', 'bundled');
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /bundled proxy was removed/);
+	assert.match(result.stderr, /pirun provider add <name> --base-url <url>/);
+});
+
 test('starting without --time is refused with the exact fixing flag', () => {
-	const result = pirun('run', preset, 'hi');
+	const result = pirun('run', preset, '--use', 'deepseek', '--model', 'deepseek-chat', 'hi');
 	assert.equal(result.status, 1);
 	assert.match(result.stderr, /--time <return-after>\/<timeout> is required/);
 	assert.match(result.stderr, /--time 10m\/2h/);
@@ -50,12 +66,12 @@ test('a preset command without a preset name says so', () => {
 	assert.match(result.stderr, /a preset name is required after "run"/);
 });
 
-test('config creates the preset with defaults and reports the wiring', () => {
-	const result = pirun('config', preset);
+test('config creates an endpoint preset and reports the wiring', () => {
+	const result = pirun('config', preset, '--use', 'deepseek', '--model', 'deepseek-chat');
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, new RegExp(`preset  ${preset}  \\(pi\\)`));
-	assert.match(result.stdout, /use     bundled  \(bundled-proxy  http:\/\/127\.0\.0\.1:\d+\/v1\)/);
-	assert.match(result.stdout, /model   cladgpt-proxy\/deepseek\.deepseek-v4-flash/);
+	assert.match(result.stdout, /use     deepseek\/main  \(openai-completions  https:\/\/api\.deepseek\.com\/v1\)/);
+	assert.match(result.stdout, /model   deepseek-chat/);
 	assert.match(result.stdout, /tools   on   context-files on/);
 	assert.match(result.stdout, /output  digest  text/);
 });
@@ -77,7 +93,7 @@ test('conflicting boolean flags are rejected', () => {
 });
 
 test('jobs on a fresh preset reports no runs', () => {
-	const result = pirun('jobs', `${preset}-empty`);
+	const result = pirun('jobs', `${preset}-empty`, '--use', 'deepseek', '--model', 'deepseek-chat');
 	assert.equal(result.status, 0, result.stderr);
 	assert.match(result.stdout, /no runs yet\./);
 });
@@ -98,7 +114,7 @@ test('providers lists canonical endpoints with their standard env vars', () => {
 	assert.equal(deepseek?.envVar, 'DEEPSEEK_API_KEY');
 	assert.equal(deepseek?.baseUrl, 'https://api.deepseek.com/v1');
 	assert.ok(names.includes('antigravity'), 'missing the antigravity harness row');
-	assert.ok(names.includes('bundled'), 'missing the bundled proxy row');
+	assert.ok(!names.includes('bundled'), 'the bundled proxy row must be gone');
 });
 
 test('a custom endpoint provider can be added, keyed, and removed', () => {
@@ -123,15 +139,23 @@ test('a custom provider without a base url is refused', () => {
 });
 
 test('provider key without any source names both conventional env vars', () => {
-	const result = pirun('provider', 'key', 'deepseek', 'spare');
+	const result = pirun('provider', 'key', 'openai', 'spare');
 	assert.equal(result.status, 1);
-	assert.match(result.stderr, /neither DEEPSEEK_API_KEY_SPARE nor DEEPSEEK_API_KEY is set/);
+	assert.match(result.stderr, /neither OPENAI_API_KEY_SPARE nor OPENAI_API_KEY is set/);
 });
 
 test('login demands a known harness and an account name', () => {
 	const result = pirun('login', 'nosuch');
 	assert.equal(result.status, 1);
 	assert.match(result.stderr, /usage: pirun login antigravity <account>/);
+});
+
+test('removed proxy commands are unknown commands', () => {
+	for (const command of ['up', 'down', 'restart', 'speedtest']) {
+		const result = pirun(command, preset);
+		assert.equal(result.status, 1, `${command} should be gone`);
+		assert.match(result.stderr, new RegExp(`unknown command "${command}"`));
+	}
 });
 
 test('help documents every command family and the timer contract', () => {
@@ -150,4 +174,6 @@ test('help documents every command family and the timer contract', () => {
 	]) {
 		assert.ok(result.stdout.includes(needle), `help is missing: ${needle}`);
 	}
+	assert.ok(!result.stdout.includes('bundled'), 'help must not mention the bundled proxy');
+	assert.ok(!result.stdout.includes('speedtest'), 'help must not mention speedtest');
 });

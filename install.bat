@@ -1,5 +1,5 @@
 @echo off
-rem One-time setup for the completions proxy and the pirun CLI.
+rem One-time setup for the pirun CLI.
 rem Safe to re-run. Pass --help for options.
 setlocal
 cd /d "%~dp0"

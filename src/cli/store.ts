@@ -24,7 +24,7 @@ export interface JobMeta {
 	id: string;
 	preset?: string;
 	harness?: 'pi' | 'antigravity';
-	apiMode?: 'bundled-proxy' | 'openai-completions' | 'antigravity-account';
+	apiMode?: 'openai-completions' | 'antigravity-account';
 	antigravity?: {
 		profileDir: string;
 		isolationMode: AntigravityIsolationMode;

@@ -97,7 +97,7 @@ frozen legacy and still contains the proxy's home docs.
 
 ## Current state
 
-- 59 tests pass (`npm test`, which also runs the line-cap guard); `npm run
+- 49 tests pass (`npm test`, which also runs the line-cap guard); `npm run
   check` syntax-checks every source file and runs the guard.
 - **Anti-bloat guard**: no source file may exceed 400 lines
   (`scripts/max-lines.mjs`). Enforced in `npm test`, `npm run check`, and a
@@ -111,48 +111,50 @@ frozen legacy and still contains the proxy's home docs.
   same names point at them.
 - v1→v2 migration is automatic and idempotent (`migratePresetsToProviders`);
   old flags are rejected with pointers to replacements.
-- The bundled proxy (`--use bundled`, port 8899) still lives inside this repo
-  (`src/server.ts`, `src/command-code-cli-adapter.ts`, `config/`); Pi and
-  speedtest use it. Endpoint presets register as native Pi
+- **The proxy is gone from this repo** (removed 2026-08-27, user decision).
+  The CladGPT completions proxy is an independent project; Pirun has no
+  special logic for it and no canonical familiarity either — the proxy is not
+  mature yet, so a user who wants it registers it like any custom endpoint
+  (`pirun provider add <name> --base-url <url>`). There is no bundled
+  provider, no `up/down/restart`, no proxy auto-start, no proxy-log
+  correlation, no speedtest. A fresh preset requires `--use` (no default
+  provider); `--use bundled` and the old `--bundled-proxy` flag get targeted
+  migration errors. Endpoint presets register as native Pi
   `openai-completions` providers keyed by provider/account in Pi's
   `models.json`.
-- Known cosmetic/deferred items: `pirun help` example still names a concrete
-  model (`deepseek-chat`) — user wants a placeholder when code is next
-  touched; Windows browser auto-open uses `rundll32` (the path that works).
+- Known cosmetic/deferred items: `pirun help` and README examples still name a
+  concrete model (`deepseek-chat`) — user wants a placeholder when code is
+  next touched; Windows browser auto-open uses `rundll32` (the path that
+  works).
 
 ## Source map (modularized 2026-08-27; every file ≤ 400 lines)
 
 `bin/pirun.ts` (dispatcher only) → `src/cli/`: `context.ts` (paths, shared
-mutable state, out/die, formatters) · `pi.ts` (Pi discovery, proxy catalogue,
-model resolution) · `preset.ts` (configurePreset, flag persistence) ·
-`proxy.ts` (bundled-proxy lifecycle) · `store.ts` (jobs, agents, sessions,
-locks, retention) · `digest.ts` (event stream → digest) · `render.ts` (digest
-and live-progress output) · `auth.ts` (Antigravity login/isolation) ·
-`spawn.ts` (createJob, harness spawn, supervisor) · `commands-*.ts` (one file
-per command family) · `help.ts`.
+mutable state, out/die, formatters) · `pi.ts` (Pi discovery, registered-model
+catalogue) · `preset.ts` (configurePreset, flag persistence, model
+resolution) · `store.ts` (jobs, agents, sessions, locks, retention) ·
+`digest.ts` (event stream → digest) · `render.ts` (digest and live-progress
+output) · `auth.ts` (Antigravity login/isolation) · `spawn.ts` (createJob,
+harness spawn, supervisor) · `commands-*.ts` (one file per command family) ·
+`help.ts`.
 
-Proxy: `src/server.ts` (router entry; re-exports parseRequestTarget) →
-`src/proxy/`: `http.ts` (settings, log, send helpers) · `shape.ts` (request
-target/value shaping) · `handlers.ts` (chat/text/models/routing) · `stream.ts`
-(SSE piping). `src/inference-provider-config.ts` is now a barrel over
-`src/inference/`: `types.ts` · `rules-parser.ts` · `catalog.ts` (YAML load,
-scores, defaults) · `routing-state.ts` (snapshot cache + recovery) ·
-`resolve.ts`. `src/command-code-cli-adapter.ts` (endpoint surface + response
-assembly) over `src/command-code/`: `protocol.ts` · `retry.ts` · `run.ts`.
-`bin/install.ts` (flow) over `src/install/`: `report.ts` · `steps.ts` ·
-`pi-registry.ts`. `src/pirun-providers.ts` (store + --use resolution)
-re-exports `src/pirun-provider-catalog.ts` (canonical endpoints, models,
-effort mapping). Unchanged: `pirun-config.ts`, `pirun-antigravity.ts`,
-`pirun-provider-net.ts`, `pirun-time.ts`, `pirun-args.ts`, `pirun-files.ts`,
-`pirun-process.ts`, `config/`.
+`src/pirun-providers.ts` (store + --use resolution) re-exports
+`src/pirun-provider-catalog.ts` (canonical endpoints, models, effort
+mapping). `bin/install.ts` (flow) over `src/install/`: `report.ts` ·
+`steps.ts`. Support: `pirun-config.ts` (presets, migration, Pi registry
+sync) · `pirun-antigravity.ts` · `pirun-provider-net.ts` (spend, /models) ·
+`pirun-time.ts` · `pirun-args.ts` · `pirun-files.ts` · `pirun-process.ts` ·
+`pirun-pi-settings.ts` · `env.ts` (endpoint keys from .env) · `paths.ts` ·
+`timeouts.ts`.
 
 ## Next phase (user's explicit plan — wait for instructions per step)
 
 1. ~~**Modularize**~~ — done 2026-08-27 (see source map and the anti-bloat
    guard above). CLI surface characterization tests added in
    `test/pirun-cli-surface.test.ts`.
-2. **Separate the proxy concern from the Pirun front door** — Pirun
-   independent of the proxy and of CladGPT; the extraction copy was step one.
+2. ~~**Separate the proxy concern from the Pirun front door**~~ — done
+   2026-08-27: the proxy code was deleted from this repo entirely (it lives
+   on in CladGPT), not wrapped. See Current state.
 3. Then refactor/code-improvement generally, and eventually more harness CLIs
    behind an adapter boundary (auth, sessions, forking, tools, providers as
    explicit capabilities) — with zero change to what harness backends observe.
