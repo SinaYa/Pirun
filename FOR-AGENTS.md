@@ -9,9 +9,9 @@ node D:\projectx\pirun\bin\install.ts
 ## Grammar
 
 Every command: `pirun <command> <preset> …`. A preset is a persistent pointer —
-provider/account (`--use`), model, effort, prefix, dir, output flags. Settings
-supplied on any launch persist into the preset; omitted ones load from it.
-Prompts and `--time` never persist. There is no setup command.
+provider/account (`--use`), model, effort, permissions, prefix, dir, output
+flags. Settings supplied on any launch persist into the preset; omitted ones
+load from it. Prompts and `--time` never persist. There is no setup command.
 
 ```powershell
 pirun agent local worker --time 10m/2h --use <provider[/account]> --model <model-id> --file C:\path\task.md
@@ -38,16 +38,17 @@ returns every provider, account, readiness, and model in one call — everything
 | custom endpoint (a local proxy included) | `--use myapi[/acct]` | `pirun provider add myapi --base-url <url>`, then `provider key` |
 | Antigravity harness | `--use antigravity/<account>` | `pirun login antigravity <account>` — opens a visible console window; the human completes the browser sign-in and pastes the code there |
 
-A fresh preset has no provider: its first launch must include `--use` (the
-error names the exact flag). There is no default provider.
-
 `pirun spend [provider[/account]] [--json]` is the one consumption interface:
 endpoint accounts answer with credits/balance; Antigravity accounts answer with
 five-hour/weekly/monthly limits, % remaining, and reset times. Check it before
 picking an account for heavy work. `pirun logout antigravity <account>` sets a
 profile aside recoverably.
 
-## Model, effort, prefix (persist per preset)
+Auth keep-alive is automatic: any pirun invocation refreshes harness accounts
+idle past `PIRUN_AUTH_KEEPALIVE_DAYS` (default 3) in a detached worker —
+unused accounts stay signed in; nothing for you to do.
+
+## Model, effort, permissions, prefix (persist per preset)
 
 - `--model <fragment>` — an unambiguous fragment of an id resolves against the
   provider's catalog; unknown ids pass through to the API as given.
@@ -117,7 +118,7 @@ check-in cadence; timeout = "longer than this can only mean failure."
 | `pirun spend [provider[/account]]` | credits / rate limits everywhere |
 | `pirun models <preset> [filter] [--refresh]` | provider catalog |
 | `pirun model <preset> [id]` | show / set the preset's model |
-| `pirun config <preset>` / `status <preset>` | inspect wiring |
+| `pirun config <preset>` / `status <preset>` | everything the preset holds (prefix verbatim) / harness wiring |
 
 Old v1 flags (`--timeout`, `--return-after`, `--api-base-url`, `--api-key*`,
 `--bundled-proxy`, compat switches) are rejected with the exact replacement.
