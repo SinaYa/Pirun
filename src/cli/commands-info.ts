@@ -69,6 +69,7 @@ export function commandConfig() {
 		harness: state.preset.harness,
 		model: state.preset.model,
 		effort: state.preset.effort ?? '(model default)',
+		permissions: state.preset.permissions ?? '(harness default)',
 		prefix: state.preset.prefix ?? '',
 		dir: state.preset.dir ?? '(invocation cwd)',
 		tools: state.preset.tools,
@@ -98,7 +99,7 @@ export function commandConfig() {
 		out(`use     ${shown.use}  (${shown.api.mode}  ${shown.api.baseUrl})`);
 		out(`model   ${shown.model}   effort ${shown.effort}`);
 		out(`dir     ${shown.dir}`);
-		out(`tools   ${shown.tools ? 'on' : 'off'}   context-files ${shown.contextFiles ? 'on' : 'off'}`);
+		out(`tools   ${shown.tools ? 'on' : 'off'}   context-files ${shown.contextFiles ? 'on' : 'off'}   permissions ${shown.permissions}`);
 		out(`output  ${shown.full ? 'full' : 'digest'}  ${shown.json ? 'json' : 'text'}`);
 		if (state.preset.harness === 'antigravity') {
 			const api = shown.api as { profile: string; authenticated: boolean; agent: string };

@@ -151,7 +151,8 @@ export function antigravityRunArgs(options: {
 	model?: string;
 	effort?: string;
 	agent?: string;
-	approveTools: boolean;
+	/** From the permission registry; empty = agy's default deny-when-headless. */
+	permissionArgs?: string[];
 	timeoutSec: number;
 }) {
 	const args = [
@@ -167,7 +168,7 @@ export function antigravityRunArgs(options: {
 	if (options.model && options.model !== 'auto') args.push('--model', options.model);
 	if (options.effort) args.push('--effort', options.effort);
 	if (options.agent) args.push('--agent', options.agent);
-	if (options.approveTools) args.push('--dangerously-skip-permissions');
+	args.push(...(options.permissionArgs ?? []));
 	return args;
 }
 

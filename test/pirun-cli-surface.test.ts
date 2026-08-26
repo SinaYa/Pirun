@@ -86,6 +86,26 @@ test('behavior flags persist into the preset and load on the next call', () => {
 	assert.match(restore.stdout, /tools   on/);
 });
 
+test('permissions persist per preset; impossible levels are refused with alternatives', () => {
+	const name = `${preset}-perms`;
+	const created = pirun('config', name, '--use', 'deepseek', '--model', 'deepseek-chat');
+	assert.equal(created.status, 0, created.stderr);
+	assert.match(created.stdout, /permissions edit/); // harness default: one above ask
+
+	const readOnly = pirun('config', name, '--permissions', 'read');
+	assert.match(readOnly.stdout, /permissions read/);
+	assert.match(pirun('config', name).stdout, /permissions read/); // persisted
+
+	const asked = pirun('config', name, '--permissions', 'ask');
+	assert.equal(asked.status, 1);
+	assert.match(asked.stderr, /--permissions ask is not available on the pi harness/);
+	assert.match(asked.stderr, /supported: read, edit, all/);
+
+	const typo = pirun('config', name, '--permissions', 'sudo');
+	assert.equal(typo.status, 1);
+	assert.match(typo.stderr, /--permissions must be read, ask, edit, all/);
+});
+
 test('config reads back everything the preset holds, prefix verbatim', () => {
 	const name = `${preset}-all`;
 	const prefix = 'Standing rule one.\nStanding rule two, kept verbatim well past sixty characters so truncation would show.';

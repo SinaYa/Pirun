@@ -88,6 +88,12 @@ Persistent preset options (accepted by every preset command):
   --effort <off|min|low|medium|high|max|Nk>
                                    reasoning intent, mapped per model — safe to
                                    set even for models without a knob
+  --permissions <read|ask|edit|all>
+                                   what the agent may do without a grant,
+                                   mapped per harness (default: edit). A level
+                                   a harness cannot honor is refused with its
+                                   alternatives; denied actions surface in the
+                                   digest as permission asks
   --prefix "<text>" | --prefix-file <path> | --no-prefix
                                    text prepended to every prompt of this preset
   --dir <path>  --antigravity-agent <name>

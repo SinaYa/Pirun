@@ -31,6 +31,12 @@ export interface Digest {
 	cost: number;
 	errors: string[];
 	notes: string[];
+	/**
+	 * Actions the agent wanted that the permission level denied. A headless
+	 * harness cannot prompt, so the denial IS the ask — surfaced to the
+	 * caller like response text, with the flag that would grant it.
+	 */
+	permissionAsks: string[];
 }
 
 function emptyDigest(): Digest {
@@ -48,9 +54,12 @@ function emptyDigest(): Digest {
 		contextTokens: 0,
 		cost: 0,
 		errors: [],
-		notes: []
+		notes: [],
+		permissionAsks: []
 	};
 }
+
+const PERMISSION_DENIAL_PATTERN = /permission check failed|denied permission|required the .* permission/i;
 
 /**
  * Pi surfaces provider failures as `errorMessage` strings that often wrap a
@@ -119,16 +128,21 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 			if (eventName === 'step_update' && isRecord(event.step_update)) {
 				const step = event.step_update;
 				if (typeof step.conversation_id === 'string') digest.sessionId = step.conversation_id;
-				if (step.step_type === 'tool' && step.state === 'DONE') {
+				if (step.step_type === 'tool' && (step.state === 'DONE' || step.state === 'ERROR')) {
 					const key = String(step.step_index ?? `${step.tool_name}:${digest.tools.length}`);
 					if (!seenTools.has(key)) {
 						seenTools.add(key);
 						const info = isRecord(step.tool_info) ? step.tool_info : null;
-						digest.tools.push({
-							name: String(step.tool_name ?? info?.name ?? 'tool'),
-							hint: argHint(info?.parameters),
-							failed: Boolean(info?.error)
-						});
+						const name = String(step.tool_name ?? info?.name ?? 'tool');
+						const hint = argHint(info?.parameters);
+						digest.tools.push({ name, hint, failed: Boolean(info?.error) });
+						const errorMessage = isRecord(info?.error) && typeof info.error.message === 'string'
+							? info.error.message
+							: '';
+						if (PERMISSION_DENIAL_PATTERN.test(errorMessage)) {
+							const ask = `${name}${hint ? `(${hint})` : ''}`;
+							if (!digest.permissionAsks.includes(ask)) digest.permissionAsks.push(ask);
+						}
 					}
 				}
 			}

@@ -67,6 +67,11 @@ Credentials live in one machine-global store
   `pirun models <preset> --refresh` pulls the live `/models` list. `--effort
   off|min|low|medium|high|max|<n>k` is stored intent, mapped per model/harness
   at call time. `--prefix` persists standing instructions per preset.
+- `--permissions read|ask|edit|all` — what the agent may do without a grant,
+  mapped per harness (Antigravity: plan / accept-edits / skip-permissions;
+  Pi: tool scopes). Default `edit`. Denied actions surface in the digest as
+  `permission:` asks with the exact widening command; levels a harness cannot
+  honor are refused naming the alternatives.
 - `pirun spend [provider[/account]]`: endpoint accounts → credits/balance;
   Antigravity accounts → five-hour/weekly/monthly windows, % remaining, reset
   times.

@@ -23,6 +23,7 @@ import {
 import { parseTimeSpec } from '../pirun-time.ts';
 import { die, PIRUN_CONFIG, state } from './context.ts';
 import { piModelsFile } from './pi.ts';
+import { resolvePermissionLevel } from './permissions.ts';
 
 export function positiveFlagInteger(args: Args, name: string, fallback: number) {
 	const raw = flagString(args, name);
@@ -148,6 +149,16 @@ export function configurePreset(args: Args) {
 			die(error instanceof Error ? error.message : String(error));
 		}
 		preset.effort = effortRaw;
+	}
+	// Permission intent: validate against what this harness can honor, and
+	// persist the resolved level so `pirun config` always shows a real value.
+	try {
+		preset.permissions = resolvePermissionLevel(
+			harness,
+			flagString(args, 'permissions').trim().toLowerCase() || preset.permissions
+		);
+	} catch (error) {
+		die(error instanceof Error ? error.message : String(error));
 	}
 	const antigravityAgent = flagString(args, 'antigravity-agent').trim();
 	if (antigravityAgent) {

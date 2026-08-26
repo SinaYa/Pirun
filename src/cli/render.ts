@@ -38,6 +38,16 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 	for (const note of digest.notes.slice(0, 2)) out(`note: ${note}`);
 	for (const error of digest.errors.slice(0, 3)) out(`error: ${error}`);
 
+	// A denial is how a headless harness asks: pass the ask up to the caller
+	// with the exact flag that would grant it, like any other response.
+	const asks = digest.permissionAsks ?? [];
+	for (const ask of asks.slice(0, 4)) {
+		out(`permission: the agent asked to ${ask} — denied at --permissions ${meta.permissions ?? '(unset)'}`);
+	}
+	if (asks.length) {
+		out(`permission: allow more for this preset: pirun config ${meta.preset ?? state.presetName} --permissions all`);
+	}
+
 	if (digest.status === 'interrupted') {
 		out(`note: the detached supervisor ended before ${meta.harness === 'antigravity' ? 'Antigravity' : 'Pi'} recorded a result.`);
 		out('      Inspect the event log, then retry the task.');

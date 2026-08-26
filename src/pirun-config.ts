@@ -22,7 +22,10 @@ export interface PirunOpenAiApi {
 	supportsReasoningEffort?: boolean;
 }
 
-export type PirunHarness = 'pi' | 'antigravity';
+/** Every harness pirun can drive. Adding one here trips the enforcement
+ *  gates (keep-alive policy, permission levels) until it is decided for. */
+export const PIRUN_HARNESSES = ['pi', 'antigravity'] as const;
+export type PirunHarness = (typeof PIRUN_HARNESSES)[number];
 
 interface LegacyAntigravityConfig {
 	effort?: 'low' | 'medium' | 'high';
@@ -36,6 +39,8 @@ export interface PirunPreset {
 	model: string;
 	/** Reasoning intent: off|min|low|medium|high|max|<n>k. Mapped per model. */
 	effort?: string;
+	/** Permission intent: read|ask|edit|all. Mapped per harness at spawn. */
+	permissions?: string;
 	/** Persistent text prepended to every prompt sent under this preset. */
 	prefix?: string;
 	dir?: string;
@@ -102,6 +107,9 @@ export function loadPirunConfig(path: string) {
 			harness
 		};
 		if (harness === 'antigravity' && !preset.model.trim()) preset.model = 'auto';
+		// Presets predating permission levels ran with everything pre-approved;
+		// record that instead of silently downgrading them to the new default.
+		if (value.permissions === undefined) preset.permissions = 'all';
 		config.presets[name] = preset;
 	}
 	return { config };

@@ -57,6 +57,12 @@ profile aside recoverably.
 - `--effort off|min|low|medium|high|max|<n>k` — reasoning intent, mapped at
   call time to whatever knob the model and harness actually speak. Safe to
   set even for models without one; the digest notes when it was ignored.
+- `--permissions read|ask|edit|all` — what the agent may do without a grant,
+  mapped to each harness's own mechanism (default `edit`: file edits allowed,
+  riskier actions not). A level the harness cannot honor is refused naming
+  the supported ones. When the agent wants something the level denies, the
+  digest carries `permission:` lines with the exact widening command — treat
+  them as the agent asking you; decide, then rerun or widen.
 - `--prefix "…"` / `--prefix-file <path>` / `--no-prefix` — text prepended to
   every prompt of the preset. Put standing instructions here once instead of
   repeating them per task.
@@ -139,6 +145,9 @@ Do not spend a run on a smoke test first; run the actual task.
 - `TIMEOUT` — it ran past your something-is-wrong threshold. Inspect the log
   before retrying; do not just retry with a bigger number.
 - `FAILED` — read the `error:` lines; they carry the provider's own message.
+- `permission:` lines — the agent asked for something its `--permissions`
+  level denies. Not a malfunction: decide whether to widen the preset (the
+  exact command is printed) or rephrase the task within the level.
 - `INTERRUPTED` — supervision died; inspect `pirun log <preset> <id>`.
 
 Transient provider failures retry automatically (five turn retries unless a

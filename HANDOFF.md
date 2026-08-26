@@ -105,6 +105,22 @@ frozen legacy and still contains the proxy's home docs.
   `agy -p "/usage"` — ordinary usage — with a 6h retry cool-down
   (`%LOCALAPPDATA%\Pirun\auth-keepalive.json`). The token-file path is
   version-sensitive (proven agy 1.1.21); revalidate on upgrades.
+- **Permission levels are an enforced per-harness requirement** (user
+  decision 2026-08-27): `--permissions read|ask|edit|all` is stored intent
+  per preset (like --effort), resolved via `HARNESS_PERMISSIONS`
+  (src/cli/permissions.ts) — every harness in `PIRUN_HARNESSES` must declare
+  a default (one above ask-for-everything ⇒ `edit`) and a reason for each
+  level it cannot honor; missing declarations fail at import time and in
+  tests. Investigated live: headless agy cannot prompt — it AUTO-DENIES
+  (stream TOOL_ERROR "permission check failed"), ladder `--mode plan` <
+  default-deny < `--mode accept-edits` < `--dangerously-skip-permissions`;
+  Pi has no permission prompts at all — levels are tool allowlists. The
+  denial IS the ask: digests carry `permission:` lines with the exact
+  widening command, traveling up like response text. Presets predating the
+  feature are stamped `all` (their old semantics); new presets get `edit`.
+  ⚠ Observation to investigate later: an agy `run_command` under
+  skip-permissions reported the profile directory as its cwd, not the run's
+  cwd — check whether agy needs --add-dir/workspace wiring for commands.
 - **Isolation is verified, not assumed.** Before login, Pirun probes that agy
   chose file-backed token storage (Windows: the SSH-env workaround, mode
   `ssh-file`) and refuses on keyring fallback. Version-sensitive: revalidate

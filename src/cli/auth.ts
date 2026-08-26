@@ -51,7 +51,7 @@ async function verifyAntigravityIsolation(entry: string, profileDir: string, cwd
 		const startedAt = Date.now();
 		const child = spawn(
 			entry,
-			antigravityRunArgs({ profileDir, approveTools: false, timeoutSec: 5 }),
+			antigravityRunArgs({ profileDir, timeoutSec: 5 }),
 			{
 				cwd,
 				stdio: ['pipe', 'ignore', 'ignore'],

@@ -15,6 +15,7 @@ import { DEFAULT_RETURN_AFTER_SECONDS } from '../timeouts.ts';
 import { die, ensureRunsDir, isAlive, PIRUN_ENTRY, SESSIONS_DIR, state, truncate } from './context.ts';
 import { findPiEntry, LEAN_FLAGS } from './pi.ts';
 import { requestedTimeSpec, resolveModel } from './preset.ts';
+import { antigravityPermissionArgs, piPermissionTools, type PermissionLevel } from './permissions.ts';
 import {
 	agentLockPath,
 	jobDir,
@@ -56,6 +57,7 @@ export function createJob(args: Args, task: string, agent?: AgentMeta, label?: s
 		tools: !args.flags.has('no-tools'),
 		use: state.preset.use,
 		effort: state.preset.effort,
+		permissions: state.preset.permissions,
 		startedAt: Date.now(),
 		timeoutSec: time.timeoutSec,
 		returnAfterSec: time.returnAfterSec,
@@ -100,6 +102,11 @@ function piArgs(meta: JobMeta, jsonMode: boolean) {
 	];
 	if (meta.effort) list.push('--thinking', piThinkingLevel(parseEffortIntent(meta.effort)));
 	if (!meta.tools) list.push('--no-tools');
+	else if (meta.permissions) {
+		// Pi has no permission prompts; levels are enforced as tool scopes.
+		const scope = piPermissionTools(meta.permissions as PermissionLevel);
+		if (scope) list.push('--tools', scope.join(','));
+	}
 	if (meta.noContextFiles) list.push('--no-context-files');
 
 	if (!meta.session) {
@@ -195,7 +202,11 @@ async function spawnAntigravity(meta: JobMeta) {
 			model: meta.model,
 			effort: meta.antigravity.effort,
 			agent: meta.antigravity.agent,
-			approveTools: meta.tools,
+			// --no-tools keeps agy's default headless policy (deny everything
+			// risky); otherwise the preset's permission level decides.
+			permissionArgs: meta.tools && meta.permissions
+				? antigravityPermissionArgs(meta.permissions as PermissionLevel)
+				: [],
 			// agy's --print-timeout cannot be moved after spawn, so it gets a
 			// generous internal ceiling; the supervisor enforces the real,
 			// live-updatable deadline.

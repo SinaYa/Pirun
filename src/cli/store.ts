@@ -39,6 +39,8 @@ export interface JobMeta {
 	use?: string;
 	/** Reasoning intent, mapped per harness at spawn. */
 	effort?: string;
+	/** Permission intent (read|edit|all), mapped per harness at spawn. */
+	permissions?: string;
 	startedAt: number;
 	finishedAt?: number;
 	exitCode?: number;

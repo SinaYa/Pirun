@@ -48,7 +48,7 @@ test('run args follow normal agy CLI usage', () => {
 			profileDir: dir,
 			conversationId: 'conv-1',
 			model: 'auto',
-			approveTools: true,
+			permissionArgs: ['--mode', 'accept-edits'],
 			timeoutSec: 90
 		});
 		assert.deepEqual(args, [
@@ -57,8 +57,10 @@ test('run args follow normal agy CLI usage', () => {
 			'--output-format', 'stream-json',
 			'--print-timeout', '90s',
 			'--conversation', 'conv-1',
-			'--dangerously-skip-permissions'
+			'--mode', 'accept-edits'
 		]);
+		// No permission args = agy's own default policy, nothing injected.
+		assert.ok(!antigravityRunArgs({ profileDir: dir, timeoutSec: 5 }).includes('--mode'));
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}
