@@ -17,6 +17,7 @@
  */
 
 import { parsePirunArgs, PROVIDER_COMMANDS, type PirunArgs as Args } from '../src/pirun-args.ts';
+import { loadEnvFile } from '../src/env.ts';
 import { die } from '../src/cli/context.ts';
 import { configurePreset } from '../src/cli/preset.ts';
 import {
@@ -48,6 +49,10 @@ import {
 	commandStatus
 } from '../src/cli/commands-info.ts';
 import { commandHelp } from '../src/cli/help.ts';
+
+// Endpoint keys from .env reach every command — provider-store commands
+// (spend, providers, provider key) need them as much as preset launches do.
+loadEnvFile();
 
 let args: Args;
 try {

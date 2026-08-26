@@ -1,6 +1,7 @@
 /** `pirun spend` — one consumption-status interface for every account kind. */
 
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { PirunArgs as Args } from '../pirun-args.ts';
 import { HARNESS_PROVIDERS } from '../pirun-providers.ts';
 import {
@@ -25,7 +26,9 @@ interface SpendRow {
 	limits?: AntigravityLimit[];
 }
 
-function fetchAntigravityAccountUsage(account: string): SpendRow {
+const execFileAsync = promisify(execFile);
+
+async function fetchAntigravityAccountUsage(account: string): Promise<SpendRow> {
 	const row: SpendRow = { provider: 'antigravity', account, kind: 'harness', supported: true, lines: [] };
 	const profileDir = antigravityAccountProfileDir(account);
 	if (!hasAntigravityAuthMarker(profileDir)) {
@@ -35,7 +38,7 @@ function fetchAntigravityAccountUsage(account: string): SpendRow {
 	try {
 		// The harness reports its own rate limits: agy answers /usage
 		// non-interactively in print mode, so this is ordinary CLI usage.
-		const text = execFileSync(
+		const { stdout: text } = await execFileAsync(
 			findAntigravityEntry(),
 			[...antigravityBaseArgs(profileDir), '-p', '/usage'],
 			{
@@ -71,39 +74,45 @@ function fetchAntigravityAccountUsage(account: string): SpendRow {
  * credits/balance, harness accounts answer with their rate-limit windows and
  * reset times.
  */
+async function endpointSpendRow(name: string, account: string, key: string): Promise<SpendRow> {
+	const store = state.providersStore;
+	try {
+		const spend = await fetchSpend(store, name, resolveAccountKey(key));
+		return { provider: name, account, kind: 'endpoint', supported: spend.supported, lines: spend.lines };
+	} catch (error) {
+		return {
+			provider: name,
+			account,
+			kind: 'endpoint',
+			supported: false,
+			lines: [`error: ${error instanceof Error ? error.message : String(error)}`]
+		};
+	}
+}
+
 export async function commandSpend(args: Args) {
 	const store = state.providersStore;
 	const only = (args.positional[0] ?? '').trim().toLowerCase();
 	const [onlyProvider = '', onlyAccount = ''] = only.split('/');
-	const report: SpendRow[] = [];
+	// Every account is queried concurrently; the report keeps a stable order.
+	const tasks: Array<Promise<SpendRow>> = [];
 
 	for (const name of Object.keys(store.endpoints).sort()) {
 		if (onlyProvider && onlyProvider !== name) continue;
 		const accounts = store.endpoints[name]?.accounts ?? {};
 		for (const [account, value] of Object.entries(accounts)) {
 			if (onlyAccount && onlyAccount !== account) continue;
-			try {
-				const key = resolveAccountKey(value.key);
-				const spend = await fetchSpend(store, name, key);
-				report.push({ provider: name, account, kind: 'endpoint', supported: spend.supported, lines: spend.lines });
-			} catch (error) {
-				report.push({
-					provider: name,
-					account,
-					kind: 'endpoint',
-					supported: false,
-					lines: [`error: ${error instanceof Error ? error.message : String(error)}`]
-				});
-			}
+			tasks.push(endpointSpendRow(name, account, value.key));
 		}
 	}
 	for (const name of HARNESS_PROVIDERS) {
 		if (onlyProvider && onlyProvider !== name) continue;
 		for (const account of Object.keys(store.harnesses[name]?.accounts ?? {})) {
 			if (onlyAccount && onlyAccount !== account) continue;
-			report.push(fetchAntigravityAccountUsage(account));
+			tasks.push(fetchAntigravityAccountUsage(account));
 		}
 	}
+	const report = await Promise.all(tasks);
 
 	if (!report.length) {
 		if (only) die(`no accounts match "${only}". See: pirun providers`);

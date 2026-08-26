@@ -21,7 +21,6 @@ import {
 	writeProvidersStore
 } from '../pirun-providers.ts';
 import { parseTimeSpec } from '../pirun-time.ts';
-import { loadEnvFile } from '../env.ts';
 import { die, PIRUN_CONFIG, state } from './context.ts';
 import { piModelsFile } from './pi.ts';
 
@@ -95,7 +94,6 @@ export function configurePreset(args: Args) {
 	if (migrated.storeChanged) writeProvidersStore(state.providersStore);
 	if (migrated.configChanged) writePirunConfig(PIRUN_CONFIG, loaded.config);
 	const preset: PirunPreset = structuredClone(loaded.config.presets[name] ?? defaultPreset());
-	loadEnvFile();
 
 	const requestedHarness = flagString(args, 'harness').trim().toLowerCase();
 	if (requestedHarness && requestedHarness !== 'pi' && requestedHarness !== 'antigravity') {
