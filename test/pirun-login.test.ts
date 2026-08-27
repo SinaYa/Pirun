@@ -98,6 +98,38 @@ test('a pasted code reaches agy and success is read from the profile', async () 
 	assert.ok(!printed.some((line) => line.includes('/quit')));
 });
 
+test('an inherited-console child (stdin null) runs without a relay and succeeds', async () => {
+	// agy's code prompt only reads a real console, so the login hands the
+	// console to agy (stdin inherited -> child.stdin null). The dialog must not
+	// read the console itself and still detects success from the profile.
+	const profileDir = profileFor('inherit');
+	writeProfileLog(profileDir, 'Using file-based token storage\n');
+	const child = fakeChild();
+	(child as { stdin: PassThrough | null }).stdin = null;
+	const openedUrls: string[] = [];
+
+	const dialog = runAntigravityLoginDialog({
+		account: 'inherit',
+		profileDir,
+		child: child as never,
+		input: new PassThrough(),
+		openUrl: (url) => openedUrls.push(url),
+		print: () => {},
+		pollMs: 25
+	});
+
+	child.stdout.write(`${OAUTH_URL}\n`);
+	await new Promise((r) => setTimeout(r, 50));
+	writeProfileLog(
+		profileDir,
+		'Using file-based token storage\nOAuth: authenticated successfully as someone\n'
+	);
+
+	const result = await dialog;
+	assert.deepEqual(result, { ok: true });
+	assert.deepEqual(openedUrls, [OAUTH_URL]);
+});
+
 test('an early agy exit fails with its last output lines as context', async () => {
 	const profileDir = profileFor('exit');
 	writeProfileLog(profileDir, 'Using file-based token storage\n');

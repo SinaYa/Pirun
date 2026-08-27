@@ -102,12 +102,16 @@ function stripAnsi(text: string) {
 }
 
 /**
- * Pirun's own login interface. Antigravity's interactive UI is never shown:
- * agy runs fully piped in the background while the human sees only these
- * prompts. The OAuth URL is scraped from agy's output for the browser, pasted
- * lines are relayed to agy's stdin, and success is detected by inspecting the
- * profile on disk — so no `/quit`, no harness TUI. On failure, agy's last
- * output lines are surfaced as context.
+ * Pirun's own login interface. agy's output stays piped and hidden while the
+ * OAuth URL is scraped from it for the browser, and success is detected by
+ * inspecting the profile on disk — so no `/quit`, no harness TUI. agy's stdin,
+ * however, must be the real console when one exists (child.stdin null here):
+ * agy's authorization-code reader only reads from a console handle — a code
+ * written to a stdin pipe is never seen (verified agy 1.1.19: a code line fed
+ * to piped stdin draws no reaction at all, neither on write nor at EOF, and
+ * agy times out as if nothing was entered). The line relay below is kept only
+ * for callers that pass a piped stdin. On failure, agy's last output lines are
+ * surfaced as context.
  */
 export async function runAntigravityLoginDialog(options: {
 	account: string;
@@ -149,8 +153,10 @@ export async function runAntigravityLoginDialog(options: {
 	watch(child.stdout);
 	watch(child.stderr);
 
-	const reader = createInterface({ input, terminal: false });
-	reader.on('line', (line) => child.stdin?.write(`${line}\n`));
+	// With inherited stdin (child.stdin null) the console feeds agy directly;
+	// reading it here too would steal keystrokes from agy's code prompt.
+	const reader = child.stdin ? createInterface({ input, terminal: false }) : null;
+	reader?.on('line', (line) => child.stdin?.write(`${line}\n`));
 
 	let exited = false;
 	let spawnFailed = false;
@@ -194,7 +200,7 @@ export async function runAntigravityLoginDialog(options: {
 		}
 		return { ok: false, reason: 'the sign-in did not complete within 15 minutes', context: lastOutput() };
 	} finally {
-		reader.close();
+		reader?.close();
 		if (child.exitCode === null && child.pid) terminateProcessTree(child.pid);
 	}
 }
@@ -236,9 +242,13 @@ export async function loginAntigravityAccount(account: string, force = false) {
 	// session survives between attempts, making the next link a few clicks.
 	const deadline = Date.now() + 15 * 60_000;
 	for (;;) {
+		// agy's authorization-code prompt reads only from a real console handle,
+		// so when this process has one (the Windows login window, a terminal) agy
+		// inherits it and the pasted code goes to agy directly. A pipe is kept
+		// only when there is no console to hand over.
 		const child = spawn(entry, [...antigravityBaseArgs(profileDir), '-p', 'Reply with exactly OK.'], {
 			cwd,
-			stdio: ['pipe', 'pipe', 'pipe'],
+			stdio: [process.stdin.isTTY ? 'inherit' : 'pipe', 'pipe', 'pipe'],
 			windowsHide: true,
 			env: antigravityEnv(isolationMode)
 		});
