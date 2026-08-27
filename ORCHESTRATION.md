@@ -91,6 +91,16 @@ not verify.
 - After compaction, the files are you: re-read rules and progress before
   touching anything.
 
+## Documentation
+
+- Document as you go, discovery by discovery — never as a pass at the end.
+- Bite-sized files, organized in folders, with long descriptive names: the
+  name is the index. No numbering, no tables of contents — both rot.
+- No prose, no filler; wording short enough to stay read, complete enough
+  to leave nothing out.
+- Skip anything a good developer or AI already knows. Document only what
+  this project alone can teach: decisions, invariants, discoveries, traps.
+
 ## Scope discipline
 
 - Improvements you notice but were not asked for go to a deferred-
