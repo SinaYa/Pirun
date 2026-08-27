@@ -106,8 +106,9 @@ questions.
 - Skip anything a good developer or AI already knows. Document only what
   this project alone can teach: decisions, invariants, discoveries, traps.
 
-These practices yield wherever the user or the project itself is specific
-about the project's documentation.
+Follow these practices only where the user or the project itself is not
+specific about the project's documentation; existing user or project
+standards on a matter take precedence over anything written here.
 
 ## Scope discipline
 
