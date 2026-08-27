@@ -98,12 +98,18 @@ interface LiveProgress {
 	lastTenSecondsTokens: number;
 	lastTenSecondsTps: number;
 	waitingForFirstToken: boolean;
+	/** Age (ms) and label of the newest harness event — the liveness signal
+	 *  for tool-heavy runs, whose work never streams as response text. */
+	lastEventAgeMs: number;
+	lastActivity: string;
 }
 
 function liveProgress(id: string, meta: JobMeta): LiveProgress {
 	const eventsPath = resolve(jobDir(id), 'events.jsonl');
 	if (!existsSync(eventsPath)) {
 		return {
+			lastEventAgeMs: -1,
+			lastActivity: '',
 			generatedTokens: 0,
 			lastTenSecondsTokens: 0,
 			lastTenSecondsTps: 0,
@@ -115,6 +121,8 @@ function liveProgress(id: string, meta: JobMeta): LiveProgress {
 	let currentText = '';
 	let recentText = '';
 	let sawGeneratedDelta = false;
+	let lastEventAt = 0;
+	let lastActivity = '';
 	const now = Date.now();
 	const recentCutoff = now - 10_000;
 	for (const line of readFileSync(eventsPath, 'utf8').split(/\r?\n/)) {
@@ -126,6 +134,14 @@ function liveProgress(id: string, meta: JobMeta): LiveProgress {
 			continue;
 		}
 		const type = String(event.type ?? '');
+		const receivedAt = Number(event._pirun_received_at ?? 0);
+		if (receivedAt >= lastEventAt) {
+			lastEventAt = receivedAt;
+			const step = isRecord(event.step_update) ? event.step_update : null;
+			lastActivity = step
+				? `${String(step.step_type ?? 'step')}${step.tool_name ? `:${step.tool_name}` : ''}`
+				: String(event.event ?? (type || 'event'));
+		}
 		if (meta.harness === 'antigravity') {
 			const step = event.event === 'step_update' && isRecord(event.step_update) ? event.step_update : null;
 			const delta = typeof step?.text_delta === 'string' ? step.text_delta : '';
@@ -167,7 +183,9 @@ function liveProgress(id: string, meta: JobMeta): LiveProgress {
 		generatedTokens,
 		lastTenSecondsTokens: recentTokens,
 		lastTenSecondsTps: recentTokens / observedWindowSeconds,
-		waitingForFirstToken: !sawGeneratedDelta
+		waitingForFirstToken: !sawGeneratedDelta,
+		lastEventAgeMs: lastEventAt ? Math.max(0, now - lastEventAt) : -1,
+		lastActivity
 	};
 }
 
@@ -186,7 +204,13 @@ export function emitRunningHandoff(meta: JobMeta, digest: Digest, args: Args) {
 		`[${label}] RUNNING  turns=${digest.turns}  ${humanDuration(Date.now() - meta.startedAt)}  ` +
 			`generated≈${humanTokens(progress.generatedTokens)}  last-10s=${progress.lastTenSecondsTps.toFixed(2)} tok/s`
 	);
-	if (progress.waitingForFirstToken) out('state: waiting for first generated token');
+	// Tool-heavy runs never stream response text, so token counters sit at 0
+	// for their whole life; the event feed is the honest liveness signal.
+	if (progress.waitingForFirstToken) {
+		out(progress.lastEventAgeMs >= 0
+			? `state: no response text yet — last harness activity ${humanDuration(progress.lastEventAgeMs)} ago (${progress.lastActivity}); tool work does not stream as tokens`
+			: 'state: waiting for the first harness event');
+	}
 	out(`${meta.harness === 'antigravity' ? 'Antigravity' : 'Pi'} continues in the background; hard stop in ${humanDuration(hardRemaining)}.`);
 	const preset = meta.preset ?? state.presetName;
 	out(

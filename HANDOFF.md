@@ -175,19 +175,23 @@ frozen legacy and still contains the proxy's home docs.
 
 ## Current state
 
-- 70 tests pass (`npm test`, which also runs the line-cap guard); `npm run
+- 72 tests pass (`npm test`, which also runs the line-cap guard); `npm run
   check` syntax-checks every source file and runs the guard. Suites: CLI
   surface characterization, lifecycle (fake-pi, fully sandboxed), providers,
   antigravity parsing, login dialog (fake child), keep-alive due-ness,
   permissions (+DENIED digest), args, time, files, pi-settings, timeouts.
-- **Two UXA test rounds completed** (4 Opus-5 test users each, 8/8 tasks
-  succeeded) and **all approved round-2 fixes shipped 2026-08-27** (agy
-  workspace wiring, truncation notice, models multi-account + `/account`
-  form, read-only recipe with `tools: none` proof, `--dir` docs, status/
-  retire smalls) — details in `UXA-FINDINGS.md`. Next work item: purge
-  `r2*` state (protocol in UXA-FINDINGS), then UXA round 3 on the task
-  variants listed there. Round-2 test state (`r2*` presets/runs,
-  `D:\projectx\pirun-uxa-test\`) not yet purged.
+- **Six UXA test rounds completed** (4 blind Opus-5 test users each; 24/24
+  tasks succeeded overall) across four autonomous improve-and-retest
+  cycles finished 2026-08-27; per-round records, friction tallies, shipped
+  fixes with rationale, and the convergence statement live in
+  `UXA-FINDINGS.md`. Round 6: zero wasted launches, zero DENIED. All
+  `uxa*`/`r2*`–`r6*` presets/agents/runs purged (only the two account
+  presets remain); test-ground artifacts kept in
+  `D:\projectx\pirun-uxa-test\round*\` as the record. Highlights shipped
+  along the way: `--answer` capture, self-healing DENIED for the agy
+  file-tool race (+ `--new-project`), `KILLED` status, fork capability in
+  `providers`, tool-activity liveness in RUNNING output, BOM-tolerant
+  state files, evidence-based permissions guidance.
 - **Anti-bloat guard**: no source file may exceed 400 lines
   (`scripts/max-lines.mjs`). Enforced in `npm test`, `npm run check`, and a
   pre-commit hook (`.githooks/pre-commit`; `core.hooksPath` is set by npm's
@@ -247,9 +251,9 @@ sync) · `pirun-antigravity.ts` · `pirun-provider-net.ts` (spend, /models) ·
 2. ~~**Separate the proxy concern from the Pirun front door**~~ — done
    2026-08-27: the proxy code was deleted from this repo entirely (it lives
    on in CladGPT), not wrapped. See Current state.
-3. ~~The approved UXA round-2 fix list~~ — shipped 2026-08-27 (see
-   `UXA-FINDINGS.md`). **Now:** UXA round 3 (same methodology, fresh Opus
-   test users, purge `r2*` state first; task variants in UXA-FINDINGS).
+3. ~~UXA fix-and-retest cycles~~ — four cycles (rounds 3–6) completed
+   2026-08-27; converged (see UXA-FINDINGS "State after cycle 4"). Further
+   rounds only after new features or harness upgrades.
 4. Then refactor/code-improvement generally, and eventually more harness CLIs
    behind an adapter boundary (auth, sessions, forking, tools, providers as
    explicit capabilities; keep-alive and permission registries already

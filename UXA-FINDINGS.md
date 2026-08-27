@@ -238,3 +238,48 @@ anchor (rejected, stands) 2.
   [IO.File]::WriteAllText); effort echo appends `(=id tier)` when the model
   id encodes the tier.
 - 72 tests pass; KILLED + providers verified live.
+
+## Round 6 (cycle-3 validation) — 4/4 success, 0 wasted launches, 0 DENIED
+
+Every cycle-3 fix confirmed in the field: A proved a cancellation from
+pirun's own output on four grounds (KILLED status + defined meaning + no
+error lines + ordering); B settled fork support from `providers --json`
+(`fork: false`) with zero probe turns and then beat the runbook's fallback
+by priming two specialists via `--prefix` (2 delegated turns, not 4);
+C chose `all` quoting the exact rewritten sentence and was vindicated
+(agent ran 3 self-verify commands on a file-only task); D's standing-rules
+prefix flow was flawless (7 tool uses total) with `(=id tier)` and
+`tools: none` both quoted as load-bearing.
+
+New findings: live progress was BLIND for tool-heavy runs (A: generated≈0,
+0.00 tok/s from start to OK out=25.8k — tool work never streams as text;
+cost A its cancel window on the first attempt) · fork fallback advice
+didn't link `--prefix` as the zero-turn priming path (B found it anyway) ·
+"there is no setup command" misleading now that bare `config` configures
+without launching (B) · KILLED exits 1 like failures (A; documented, not
+changed) · smalls: `ask` unexplained headless, `--dir` cwd default
+foot-gun (C), no byte count for short answers (D; skipped — short answers
+print whole).
+
+## Fixes shipped from round 6 (cycle 4, closing)
+
+- Live progress liveness for tool-heavy runs: the RUNNING line's waiting
+  state now reports the newest harness event's age and label
+  (`last harness activity 1.3s ago (tool:run_command); tool work does not
+  stream as tokens`) — verified live; runbook's slow-start note explains it.
+- Docs: fork row names `--prefix` as zero-turn priming · "No setup step:
+  any launch creates the preset, and `pirun config <preset> <flags>`
+  configures one without launching" · exit-code line covers KILLED · `ask`
+  headless refusal stated · `--dir` "set it explicitly" nudge.
+- 72 tests pass.
+
+## State after cycle 4
+
+Four consecutive rounds at 4/4 task success; round 6 had zero wasted
+launches and zero DENIED. The loop has converged: remaining nonzero
+friction is upstream agy nondeterminism (LIMITATIONS.md), deliberate
+design (`--time` calibration hints — rejected twice), or micro-polish.
+Parked ideas (user judgment): permission tier "commands scoped to --dir" ·
+multi-run `wait` · tool-enforced file ownership · catalog tier-axis
+annotation · distinct exit code for KILLED. Next standing work: HANDOFF
+next-phase step 4 (refactor, more harnesses, then public release).

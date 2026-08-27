@@ -11,7 +11,9 @@ node D:\projectx\pirun\bin\install.ts
 Every command: `pirun <command> <preset> …`. A preset is a persistent pointer —
 provider/account (`--use`), model, effort, permissions, prefix, dir, output
 flags. Settings supplied on any launch persist into the preset; omitted ones
-load from it. Prompts and `--time` never persist. There is no setup command.
+load from it. Prompts and `--time` never persist. No setup step: any launch
+creates the preset, and `pirun config <preset> <flags>` configures one
+without launching.
 
 ```powershell
 pirun agent local worker --time 10m/2h --use <provider[/account]> --model <model-id> --file C:\path\task.md
@@ -28,7 +30,10 @@ some providers never report it). `pirun run <preset> …` is one-shot with no
 memory.
 
 Some models queue long for provider capacity before the first token; a slow
-start is not a model failure — read the progress digest before judging.
+start is not a model failure — read the progress digest before judging. Tool
+work (file writes, commands) never streams as tokens, so a busy run can show
+`generated≈0` throughout; the progress line's harness-activity age is the
+liveness signal there.
 
 ## Providers and accounts (shared, outside presets)
 
@@ -73,7 +78,8 @@ profile aside recoverably.
   for enforced containment, knowingly trading a possible wasted launch.
   Ladder sharp edges: `edit` allows NO commands, not even read-only ones;
   on some harnesses `read` maps to a plan mode that can deny even file
-  reads headlessly. For a **guaranteed** read-only review, remove the
+  reads headlessly, and `ask` is refused outright by current harnesses —
+  headless runs cannot prompt anyone. For a **guaranteed** read-only review, remove the
   capability instead of trusting a policy: inline the content in the prompt
   AND pass `--no-tools --no-context-files` — the agent then cannot touch any
   file, and the digest prints `tools: none (disabled with --no-tools)` as
@@ -89,8 +95,8 @@ profile aside recoverably.
   read-only reviews (inline the content in the prompt).
 - `--dir <path>` — the working directory the delegated agent runs in;
   relative paths in the task resolve there, and files it creates land there.
-  Defaults to the invocation cwd; persists into the preset like every other
-  setting, so set it once per project preset.
+  Defaults to the invocation cwd — set it explicitly; your own cwd is
+  rarely the work area. Persists into the preset like every other setting.
 - `--prefix "…"` / `--prefix-file <path|->` / `--no-prefix` — text prepended
   to every prompt of the preset; `-` reads it from stdin
   (`echo rules | pirun config p --prefix-file -`), no temp file. Put standing
@@ -123,8 +129,10 @@ pirun time <preset> <id> 45m         # set the deadline to now+45m
 pirun kill <preset> <id>             # stop the run
 ```
 
-Exit codes: `0` produced output · `1` failed/empty/timed out · `2` still
-running. Branch on the code, not wording. Rule of thumb: return-after = your
+Exit codes: `0` produced output · `1` failed/empty/timed out/killed · `2`
+still running. Branch on the code, not wording — except your own `kill`:
+a KILLED run also exits 1, and the status word is what says it was your
+cancellation, not a failure. Rule of thumb: return-after = your
 check-in cadence; timeout = "longer than this can only mean failure."
 
 ## Commands
@@ -132,7 +140,7 @@ check-in cadence; timeout = "longer than this can only mean failure."
 | Command | Purpose |
 |---|---|
 | `pirun agent <preset> <name> --time <ra>/<to> <task>` | persistent agent turn |
-| `pirun fork <preset> <parent> <child> --time <ra>/<to> <task>` | branch a primed agent (`pirun providers` marks sources that cannot fork; replay the priming task into a new agent there) |
+| `pirun fork <preset> <parent> <child> --time <ra>/<to> <task>` | branch a primed agent (`pirun providers` marks sources that cannot fork; there, shared context in `--prefix` primes every new agent for zero turns) |
 | `pirun agents <preset> [name]` | context, token use, busy state |
 | `pirun retire <preset> <name>` / `--all` | remove an idle agent |
 | `pirun run <preset> --time <ra>/<to> <task>` | one-shot task |
