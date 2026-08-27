@@ -147,8 +147,9 @@ otherwise how to do autonomous work:
   your context: have a reviewer agent read it. Give the review task what
   only you hold — the intent, the constraints, the doer's claims — and
   read back findings, not files. Ask further where findings leave you
-  unconvinced; look yourself only where your own judgment is genuinely
-  the scarce ingredient.
+  unconvinced; look yourself only where the work itself calls for it — a
+  mistake there would be expensive, or it needs deeper specialized
+  knowledge than your agents are showing.
 - Commit and update the progress log at every meaningful step.
 - No high-impact changes to the machine.
 
