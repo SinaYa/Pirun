@@ -152,15 +152,18 @@ export async function runAntigravityLoginDialog(options: {
 	reader.on('line', (line) => child.stdin?.write(`${line}\n`));
 
 	let exited = false;
+	let spawnFailed = false;
 	child.once('exit', () => {
 		exited = true;
 	});
 	child.once('error', () => {
 		exited = true;
+		spawnFailed = true;
 	});
 
 	const lastOutput = () =>
 		stripAnsi(buffer).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-5);
+	let warnedSilent = false;
 
 	try {
 		while (Date.now() < deadline) {
@@ -169,15 +172,22 @@ export async function runAntigravityLoginDialog(options: {
 				return { ok: false, reason: 'the login left the isolated file-backed profile (keyring detected)', context: lastOutput() };
 			}
 			if (inspected.authenticated && inspected.usesFileStorage) return { ok: true };
-			if (exited && child.exitCode !== null) {
+			if (exited) {
 				// One last look: the success record can land just before exit.
 				const final = inspectAntigravityProfile(options.profileDir, startedAt);
 				if (final.authenticated && final.usesFileStorage && !final.usesKeyring) return { ok: true };
 				return {
 					ok: false,
-					reason: `Antigravity exited (${child.exitCode}) before authentication completed`,
+					reason: spawnFailed
+						? 'Antigravity could not be started (spawn error)'
+						: `Antigravity exited (${child.exitCode}) before authentication completed`,
 					context: lastOutput()
 				};
+			}
+			if (!opened && !warnedSilent && buffer.length === 0 && Date.now() - startedAt > 30_000) {
+				warnedSilent = true;
+				print('Antigravity has produced no output for 30 seconds.');
+				print(`If this persists, check the logs under ${options.profileDir} and re-run the login.`);
 			}
 			await new Promise((resolvePoll) => setTimeout(resolvePoll, options.pollMs ?? 500));
 		}
@@ -202,7 +212,14 @@ export async function loginAntigravityAccount(account: string, force = false) {
 		out(`Checking isolated credential storage for account "${account}"…`);
 		isolationMode = await verifyAntigravityIsolation(entry, profileDir, cwd);
 	}
-	const child = spawn(entry, antigravityBaseArgs(profileDir), {
+	// Login must run agy in print mode: the interactive TUI emits nothing on
+	// piped stdio — with stdin held open it blocks reading stdin before printing
+	// a single byte (verified agy 1.1.19 on Windows: 0 bytes on stdout+stderr,
+	// language server never starts). Print mode is what emits "Authentication
+	// required. Please visit the URL to log in:" on stderr, accepts a pasted
+	// authorization code on stdin, and records "Print mode: silent auth
+	// succeeded" — the success pattern this login already detects.
+	const child = spawn(entry, [...antigravityBaseArgs(profileDir), '-p', 'Reply with exactly OK.'], {
 		cwd,
 		stdio: ['pipe', 'pipe', 'pipe'],
 		windowsHide: true,
