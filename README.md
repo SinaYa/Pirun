@@ -30,9 +30,10 @@ enough. Windows, macOS, Linux.
    here, or `pirun provider key <provider> <account> --env VAR`).
 
 Then hand the AI [FOR-AGENTS.md](FOR-AGENTS.md) — the complete runbook.
-`pirun help` is the command reference. [ORCHESTRATION.md](ORCHESTRATION.md)
-is an optional standing prompt of delegation strategy an orchestrator can
-adopt as it sees fit.
+`pirun help` is the command reference. AIs orchestrating through pirun:
+also read [ORCHESTRATION.md](ORCHESTRATION.md) and follow it strictly —
+it governs how you delegate (its own rules state how user instructions
+supersede it).
 
 ## Presets
 
