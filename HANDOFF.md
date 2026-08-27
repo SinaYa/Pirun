@@ -215,9 +215,7 @@ frozen legacy and still contains the proxy's home docs.
   migration errors. Endpoint presets register as native Pi
   `openai-completions` providers keyed by provider/account in Pi's
   `models.json`.
-- Known cosmetic/deferred items: `pirun help` and README examples still name a
-  concrete model (`deepseek-chat`) — user wants a placeholder when code is
-  next touched; Windows browser auto-open uses `rundll32` (the path that
+- Known cosmetic/deferred items: Windows browser auto-open uses `rundll32` (the path that
   works); `pirun config <preset> --json` persists the json flag (one-off
   JSON reads flip the preset's output mode — unresolved trap).
 

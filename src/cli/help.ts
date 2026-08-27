@@ -107,7 +107,7 @@ Persistent preset options (accepted by every preset command):
 
 First launch (one command, everything persists):
   pirun agent fast worker --time 10m/2h "Implement the change" \\
-    --use deepseek --model deepseek-chat --effort high
+    --use deepseek --model <model-id> --effort high
 
 Later launches load the saved settings:
   pirun agent fast worker --time 10m/2h "Continue with the next change"

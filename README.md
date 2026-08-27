@@ -3,8 +3,8 @@
 Front door for delegating work to coding-agent harness CLIs. An orchestrating
 AI (or a human) names the task, the provider/account, and the timers; pirun
 drives the harness, keeps the full event stream on disk, and returns a compact
-digest with an actionable exit code (`0` output · `1` failed/empty/timeout ·
-`2` still running).
+digest with an actionable exit code (`0` output · `1` failed/empty/timeout/
+killed · `2` still running).
 
 Two consumption sources, one grammar:
 
@@ -49,7 +49,9 @@ Named agents remember prior turns (and keep the provider's prefix cache);
 `run` is one-shot; `fork` branches a primed agent. `--time
 <return-after>/<timeout>` is required on every start: return-after bounds only
 your wait (exit 2 + progress digest, run continues detached); timeout is the
-hard stop, live-movable with `pirun time <preset> <id> +30m`.
+hard stop, live-movable with `pirun time <preset> <id> +30m`. Digest answers
+cap at 2000 chars; `pirun poll <preset> <id> --answer` prints the complete
+response text alone, ready to redirect into a file.
 
 ## Providers
 
