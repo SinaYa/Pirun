@@ -14,6 +14,7 @@ import {
 	type PirunPreset
 } from '../pirun-config.ts';
 import {
+	antigravityEffortLevel,
 	endpointModels,
 	parseEffortIntent,
 	resolveEndpointModel,
@@ -21,7 +22,7 @@ import {
 	writeProvidersStore
 } from '../pirun-providers.ts';
 import { parseTimeSpec } from '../pirun-time.ts';
-import { die, PIRUN_CONFIG, state } from './context.ts';
+import { die, missingFileHint, PIRUN_CONFIG, state } from './context.ts';
 import { piModelsFile } from './pi.ts';
 import { resolvePermissionLevel } from './permissions.ts';
 
@@ -160,6 +161,20 @@ export function configurePreset(args: Args) {
 	} catch (error) {
 		die(error instanceof Error ? error.message : String(error));
 	}
+	// Antigravity publishes effort tiers as model-id suffixes (…-high/-medium/
+	// -low), which would store effort twice. Keep it single-sourced: --effort
+	// rewrites the suffix, and a suffixed id given without --effort becomes the
+	// stored effort. The id still reaches agy verbatim.
+	if (harness === 'antigravity') {
+		const suffixed = /^(.+)-(high|medium|low)$/.exec(preset.model);
+		if (suffixed && effortRaw) {
+			const level = antigravityEffortLevel(parseEffortIntent(effortRaw));
+			if (suffixed[2] !== level) preset.model = `${suffixed[1]}-${level}`;
+		} else if (suffixed && (model || !preset.effort)) {
+			preset.effort = suffixed[2];
+		}
+	}
+
 	const antigravityAgent = flagString(args, 'antigravity-agent').trim();
 	if (antigravityAgent) {
 		if (harness !== 'antigravity') die('--antigravity-agent requires an Antigravity preset (--use antigravity).');
@@ -177,7 +192,7 @@ export function configurePreset(args: Args) {
 		preset.prefix = readFileSync(0, 'utf8').trim();
 		state.stdinUsedForPrefix = true;
 	} else if (prefixFile) {
-		if (!existsSync(prefixFile)) die(`prefix file not found: ${prefixFile}`);
+		if (!existsSync(prefixFile)) die(`prefix file not found: ${prefixFile}${missingFileHint(prefixFile)}`);
 		preset.prefix = readFileSync(prefixFile, 'utf8').trim();
 	}
 	if (args.flags.has('no-prefix')) delete preset.prefix;

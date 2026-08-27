@@ -61,7 +61,8 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 
 	if (digest.text) {
 		out('---');
-		out(options.full ? digest.text : truncate(digest.text, 2000));
+		// The answer is the payload: cap its length but keep its line structure.
+		out(options.full || digest.text.length <= 2000 ? digest.text : `${digest.text.slice(0, 2000)}…`);
 	}
 }
 

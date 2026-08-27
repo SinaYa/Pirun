@@ -84,4 +84,6 @@ test('an agy permission denial surfaces in the digest as a permission ask', () =
 	assert.deepEqual(digest.permissionAsks, ['run_command(Get-Location)']);
 	assert.equal(digest.tools.length, 1);
 	assert.equal(digest.tools[0].failed, true);
+	// Contentless + denied is DENIED, never EMPTY — "retry" advice must not apply.
+	assert.equal(digest.status, 'denied');
 });

@@ -4,10 +4,12 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flagString, type PirunArgs as Args } from '../pirun-args.ts';
-import { syncPiEndpointProvider, writePirunConfig } from '../pirun-config.ts';
+import { loadPirunConfig, syncPiEndpointProvider, writePirunConfig } from '../pirun-config.ts';
 import {
 	endpointBaseUrl,
 	endpointModels,
+	HARNESS_PROVIDERS,
+	knownProviderNames,
 	providersStorePath,
 	resolveEndpointModel,
 	writeProvidersStore
@@ -115,6 +117,75 @@ export function commandConfig() {
 			out('prefix  (none)');
 		}
 	}
+}
+
+/**
+ * `pirun models <name>`: a name that is not an existing preset but is a known
+ * provider browses that provider's catalog directly — no preset needed, which
+ * is exactly the fresh-machine situation. Preset names win on collision.
+ */
+export function providerForModels(nameRaw: string | undefined): string {
+	const name = (nameRaw ?? '').trim();
+	if (!name) return '';
+	try {
+		if (loadPirunConfig(PIRUN_CONFIG).config.presets[name]) return '';
+	} catch {
+		return '';
+	}
+	const lowered = name.toLowerCase();
+	return knownProviderNames(state.providersStore).includes(lowered) ? lowered : '';
+}
+
+export async function commandProviderModels(provider: string, args: Args) {
+	if ((HARNESS_PROVIDERS as readonly string[]).includes(provider)) {
+		const entry = state.providersStore.harnesses[provider];
+		const accounts = Object.keys(entry?.accounts ?? {});
+		const account = entry?.defaultAccount ?? (accounts.length === 1 ? accounts[0] : '');
+		if (!account) {
+			die(accounts.length
+				? `${provider} has ${accounts.length} accounts; set one as default (pirun provider default ${provider} <account>) or use a preset.`
+				: `${provider} has no accounts yet.\nrun: pirun login ${provider} <account>`);
+		}
+		try {
+			const profileDir = antigravityAccountProfileDir(account);
+			const text = execFileSync(findAntigravityEntry(), [...antigravityBaseArgs(profileDir), 'models'], {
+				encoding: 'utf8',
+				windowsHide: true,
+				env: antigravityEnv(antigravityIsolationMode(profileDir))
+			});
+			const filter = (args.positional[1] ?? '').toLowerCase();
+			for (const line of text.split(/\r?\n/)) {
+				if (!filter || line.toLowerCase().includes(filter)) out(line);
+			}
+		} catch (error) {
+			die(error instanceof Error ? error.message : String(error));
+		}
+		return;
+	}
+	const filter = (args.positional[1] ?? '').toLowerCase();
+	const models = endpointModels(state.providersStore, provider).filter(
+		(model) => !filter || model.id.toLowerCase().includes(filter)
+	);
+	if (args.flags.has('json')) {
+		out(JSON.stringify({ provider, models }, null, 2));
+		return;
+	}
+	if (!models.length) {
+		out(filter
+			? `no ${provider} model matches "${filter}".`
+			: `no known models for ${provider}. Refresh through a preset: pirun models <preset> --refresh`);
+		return;
+	}
+	out(`${'  model'.padEnd(46)}${'ctx'.padStart(7)}${'out'.padStart(8)}   reasoning`);
+	for (const model of models) {
+		const reasoning = model.alwaysReasoning ? 'always-on' : model.reasoning ? 'levels' : '-';
+		out(
+			`  ${model.id.padEnd(44)}` +
+				`${humanTokens(model.contextWindow ?? 0).padStart(7)}${humanTokens(model.maxTokens ?? 0).padStart(8)}   ${reasoning}`
+		);
+	}
+	out('');
+	out(`use one: pirun agent <preset> <name> --time <ra>/<to> --use ${provider} --model <id> "<task>"`);
 }
 
 export async function commandModels(args: Args) {

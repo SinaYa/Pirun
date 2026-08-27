@@ -29,8 +29,9 @@ start is not a model failure — read the progress digest before judging.
 ## Providers and accounts (shared, outside presets)
 
 Authentication lives in one machine-global store. `pirun providers --json`
-returns every provider, account, readiness, and model in one call — everything
-`--use` can say.
+returns every provider, account, and readiness in one call — everything
+`--use` can say. Model catalogs: `pirun models <provider>` (no preset needed;
+harness catalogs are fetched live from the harness).
 
 | Source | Select with | Accounts come from |
 |---|---|---|
@@ -48,18 +49,25 @@ profile aside recoverably.
 
 - `--model <fragment>` — an unambiguous fragment of an id resolves against the
   provider's catalog; unknown ids pass through to the API as given.
-  `pirun models <preset> [--refresh]` lists the catalog; `--refresh` pulls the
-  live `/models`. Agents pin their model — switching mid-session is refused
-  because it would discard the cached prefix.
+  `pirun models <preset|provider> [--refresh]` lists the catalog; `--refresh`
+  pulls the live `/models`. Agents pin their model — switching mid-session is
+  refused because it would discard the cached prefix.
 - `--effort off|min|low|medium|high|max|<n>k` — reasoning intent, mapped at
   call time to whatever knob the model and harness actually speak. Safe to
   set even for models without one; the digest notes when it was ignored.
+  Model ids that themselves encode an effort tier are auto-aligned: the tier
+  becomes the stored effort, and a later `--effort` rewrites the id's tier —
+  set either, never worry about both.
 - `--permissions read|ask|edit|all` — what the agent may do without a grant,
-  mapped to each harness's own mechanism (default `edit`: file edits allowed,
-  riskier actions not). A level the harness cannot honor is refused naming
-  the supported ones. When the agent wants something the level denies, the
-  digest carries `permission:` lines with the exact widening command — treat
-  them as the agent asking you; decide, then rerun or widen.
+  mapped to each harness's own mechanism (default `edit`). Know the ladder's
+  sharp edges: `edit` allows file edits but NO commands, not even read-only
+  ones; on some harnesses `read` maps to a plan mode that can deny even file
+  reads headlessly — for a guaranteed read-only review, inline the content in
+  the prompt instead of pointing at files. A level the harness cannot honor
+  is refused naming the supported ones. When the agent wants something the
+  level denies, the digest carries `permission:` lines with the exact
+  widening command — treat them as the agent asking you; decide, then rerun
+  or widen.
 - `--prefix "…"` / `--prefix-file <path|->` / `--no-prefix` — text prepended
   to every prompt of the preset; `-` reads it from stdin
   (`echo rules | pirun config p --prefix-file -`), no temp file. Put standing
@@ -127,6 +135,9 @@ non-overlapping file ownership. A new agent has no memory of your
 conversation: state objective, exact files/scope, constraints, completion
 gates. Standing rules belong in the preset's `--prefix`, not in every task.
 
+Quote Windows paths (or use forward slashes) — your shell can eat unquoted
+backslashes before pirun ever sees them.
+
 Long tasks go in a file; prompts travel on stdin either way, so quoting,
 newlines, and length are never your problem:
 
@@ -140,6 +151,9 @@ Do not spend a run on a smoke test first; run the actual task.
 
 - `RUNNING` — healthy and detached; poll or wait with the printed id.
 - `EMPTY` — provider ended without an answer; retry. Not a capability verdict.
+- `DENIED` — the run produced nothing because its actions were denied at the
+  `--permissions` level. Do NOT retry unchanged (it will loop): widen the
+  level with the printed command, or rephrase the task within it.
 - `TIMEOUT` — it ran past your something-is-wrong threshold. Inspect the log
   before retrying; do not just retry with a bigger number.
 - `FAILED` — read the `error:` lines; they carry the provider's own message.

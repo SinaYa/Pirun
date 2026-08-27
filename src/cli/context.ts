@@ -173,6 +173,16 @@ export function humanTokens(value: number) {
 	return `${(value / 1000).toFixed(1)}k`;
 }
 
+/**
+ * A drive letter immediately followed by a non-separator ("D:projectx…") is
+ * the signature of a shell eating unquoted backslashes before pirun ran.
+ */
+export function missingFileHint(path: string) {
+	return /^[A-Za-z]:[^\\/]/.test(path)
+		? ' (your shell may have eaten unquoted backslashes — quote the path or use forward slashes)'
+		: '';
+}
+
 export function truncate(value: string, max: number) {
 	const flat = value.replace(/\s+/g, ' ').trim();
 	return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;

@@ -7,7 +7,7 @@ import { atomicWriteJson, updateOwnedLock } from '../pirun-files.ts';
 import { terminateProcessTree } from '../pirun-process.ts';
 import { humanClock, parseTimeAdjust, parseWaitTime } from '../pirun-time.ts';
 import { DEFAULT_RETURN_AFTER_SECONDS } from '../timeouts.ts';
-import { die, humanDuration, isAlive, out, state } from './context.ts';
+import { die, humanDuration, isAlive, missingFileHint, out, state } from './context.ts';
 import { ensureHarnessAuthentication } from './auth.ts';
 import { resolveModel } from './preset.ts';
 import {
@@ -44,7 +44,7 @@ export function readTask(args: Args): string {
 
 	const file = flagString(args, 'file');
 	if (file) {
-		if (!existsSync(file)) die(`prompt file not found: ${file}`);
+		if (!existsSync(file)) die(`prompt file not found: ${file}${missingFileHint(file)}`);
 		return withPrefix(readFileSync(file, 'utf8'));
 	}
 

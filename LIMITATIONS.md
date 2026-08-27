@@ -82,6 +82,34 @@ as a failed request, not as something checkable in advance.
 
 ---
 
+## Headless plan mode can deny file reads, nondeterministically
+
+Observed live (agy 1.1.21, `--permissions read` → `--mode plan`): in one turn
+the agent's `view_file` of one file was auto-denied ("headless mode cannot
+prompt … auto-denied") while an identical `view_file` of a second file in the
+same directory was allowed, and the result status came back `CANCELED`. No
+rule explains the difference. Consequence: `read` is the only level that
+guarantees no writes, but it cannot guarantee the reading succeeds. The
+working pattern for guaranteed read-only review is to inline the content into
+the prompt so no file tool runs at all.
+
+**To fix:** agy would need a headless read-allow policy (its `permissions.allow`
+rules are per-profile, and profiles are shared by concurrent runs with
+different levels, so pirun cannot seed them per run).
+
+---
+
+## Effort-tier model ids can compose a tier a model lacks
+
+Antigravity publishes effort tiers inside model ids, and tiers vary per model
+(some have high/medium/low, some high/low, some one tier, some none). pirun
+keeps effort single-sourced by rewriting the id's tier when `--effort`
+changes; if the composed id does not exist for that model, the harness rejects
+it at run time with its own error. pirun cannot validate offline — the tier
+list lives only in the harness's live catalog (`pirun models antigravity`).
+
+---
+
 ## Model capability flags are declared, not probed
 
 The catalog's `reasoning` flag decides whether Pi offers thinking levels for a

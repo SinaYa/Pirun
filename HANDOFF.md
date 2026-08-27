@@ -121,6 +121,19 @@ frozen legacy and still contains the proxy's home docs.
   ⚠ Observation to investigate later: an agy `run_command` under
   skip-permissions reported the profile directory as its cwd, not the run's
   cwd — check whether agy needs --add-dir/workspace wiring for commands.
+- **UXA round-1 fixes (2026-08-27, from 4 live Opus-5 test users):** state
+  moved to the machine-global home (see below); antigravity effort-suffix
+  model ids auto-align with --effort (--effort wins, rewrites the suffix —
+  effort is stored once); contentless permission-denied runs report status
+  `DENIED` (never "retry" advice); `pirun models <provider>` browses a
+  catalog with no preset (fresh-machine chicken-and-egg); `--help` anywhere
+  prints help; digest answers keep newlines (capped, not flattened);
+  file-not-found errors hint when a shell ate backslashes. agy plan-mode
+  read denials and per-model tier gaps are recorded in LIMITATIONS.md.
+- **State home**: presets (`pirun.json`) and runs live in `pirunStateRoot()`
+  (`%LOCALAPPDATA%\Pirun`; PIRUN_STATE_DIR / PIRUN_RUNS_DIR /
+  PIRUN_CONFIG_PATH override) — never in the repo. Legacy repo state
+  migrates once, only from a real CLI invocation with no live runs.
 - **Isolation is verified, not assumed.** Before login, Pirun probes that agy
   chose file-backed token storage (Windows: the SSH-env workaround, mode
   `ssh-file`) and refuses on keyring fallback. Version-sensitive: revalidate

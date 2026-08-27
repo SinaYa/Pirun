@@ -18,6 +18,7 @@ const testEnv = {
 	PIRUN_CONFIG_PATH: resolve(sandbox, 'config.json'),
 	PIRUN_PROVIDERS_PATH: resolve(sandbox, 'providers.json'),
 	PIRUN_RUNS_DIR: resolve(sandbox, 'runs'),
+	PIRUN_STATE_DIR: resolve(sandbox, 'state'),
 	HOME: sandbox,
 	USERPROFILE: sandbox,
 	DEEPSEEK_API_KEY: 'sk-offline-test',
@@ -105,6 +106,46 @@ test('permissions persist per preset; impossible levels are refused with alterna
 	const typo = pirun('config', name, '--permissions', 'sudo');
 	assert.equal(typo.status, 1);
 	assert.match(typo.stderr, /--permissions must be read, ask, edit, all/);
+});
+
+test('help answers --help anywhere instead of erroring', () => {
+	for (const argv of [['agent', '--help'], ['run', preset, '-h'], ['--help']]) {
+		const result = pirun(...argv);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /delegate work to persistent coding-agent harnesses/);
+	}
+});
+
+test('models <provider> browses a catalog with no preset involved', () => {
+	const result = pirun('models', 'deepseek');
+	assert.equal(result.status, 0, result.stderr);
+	assert.match(result.stdout, /deepseek-chat/);
+	assert.match(result.stdout, /deepseek-reasoner.*always-on/);
+	assert.match(result.stdout, /use one: pirun agent <preset>/);
+	// A name that is neither preset nor provider still follows the preset path.
+	const unknown = pirun('models', 'not-a-provider');
+	assert.equal(unknown.status, 1);
+	assert.match(unknown.stderr, /has no provider; pass --use/);
+});
+
+test('antigravity effort-suffix model ids stay aligned with --effort', () => {
+	const name = `${preset}-align`;
+	const created = pirun('config', name, '--use', 'antigravity/uxatest', '--model', 'gemini-x-flash-high');
+	assert.equal(created.status, 0, created.stderr);
+	// Suffix adopted as the stored effort.
+	assert.match(created.stdout, /model   gemini-x-flash-high   effort high/);
+	// --effort rewrites the suffix; stored once, consistently.
+	const lowered = pirun('config', name, '--effort', 'low');
+	assert.match(lowered.stdout, /model   gemini-x-flash-low   effort low/);
+	// Contradictory explicit inputs: --effort wins.
+	const both = pirun('config', name, '--model', 'gemini-x-flash-medium', '--effort', 'high');
+	assert.match(both.stdout, /model   gemini-x-flash-high   effort high/);
+});
+
+test('a mangled-looking path gets the shell-quoting hint', () => {
+	const result = pirun('run', preset, '--time', '1m/2m', '--file', 'D:mangledpath');
+	assert.equal(result.status, 1);
+	assert.match(result.stderr, /prompt file not found: D:mangledpath \(your shell may have eaten unquoted backslashes/);
 });
 
 test('config reads back everything the preset holds, prefix verbatim', () => {

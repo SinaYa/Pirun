@@ -46,7 +46,9 @@ import {
 	commandLog,
 	commandModel,
 	commandModels,
-	commandStatus
+	commandProviderModels,
+	commandStatus,
+	providerForModels
 } from '../src/cli/commands-info.ts';
 import { commandHelp } from '../src/cli/help.ts';
 import { commandKeepalive, maybeSpawnKeepalive } from '../src/cli/keepalive.ts';
@@ -69,7 +71,14 @@ const KNOWN_COMMANDS = new Set([
 ]);
 if (!KNOWN_COMMANDS.has(args.command)) die(`unknown command "${args.command}". Run "pirun help".`);
 
-if (!['_supervise', '_keepalive', 'help', '--help', '-h'].includes(args.command) && !PROVIDER_COMMANDS.has(args.command)) {
+// `models <provider>` browses a provider catalog with no preset involved.
+const modelsProvider = args.command === 'models' ? providerForModels(args.positional[0]) : '';
+
+if (
+	!['_supervise', '_keepalive', 'help', '--help', '-h'].includes(args.command) &&
+	!PROVIDER_COMMANDS.has(args.command) &&
+	!modelsProvider
+) {
 	configurePreset(args);
 }
 
@@ -147,7 +156,8 @@ switch (args.command) {
 		commandTime(args);
 		break;
 	case 'models':
-		await commandModels(args);
+		if (modelsProvider) await commandProviderModels(modelsProvider, args);
+		else await commandModels(args);
 		break;
 	case 'model':
 		commandModel(args);

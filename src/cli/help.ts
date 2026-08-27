@@ -42,9 +42,10 @@ provider store, not in presets — authenticate once, use from any preset.
 
   pirun config <preset>            inspect the selected preset
   pirun status <preset>            service, harness and model wiring at a glance
-  pirun models <preset> [filter] [--json] [--refresh]
-                                   the preset's provider's models (--refresh
-                                   pulls the live /models list)
+  pirun models <preset|provider> [filter] [--json] [--refresh]
+                                   a preset's — or, with no preset yet, any
+                                   provider's — model catalog (--refresh pulls
+                                   the live /models list)
   pirun model <preset> [<id>]      show or set the preset's model
 
 Provider store (shared across presets; no preset argument):
@@ -97,7 +98,8 @@ Persistent preset options (accepted by every preset command):
   --prefix "<text>" | --prefix-file <path|-> | --no-prefix
                                    text prepended to every prompt of this
                                    preset; "-" reads it from stdin
-  --dir <path>  --antigravity-agent <name>
+  --dir <path>                     working directory for the preset's runs
+  --antigravity-agent <name>       Antigravity persona for this preset
   --tools|--no-tools --context-files|--no-context-files
   --full|--no-full --json|--no-json
 

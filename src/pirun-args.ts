@@ -126,6 +126,11 @@ const MOVED_FLAGS: Record<string, string> = {
 
 /** Strict parsing prevents a typo from silently changing how an agent run behaves. */
 export function parsePirunArgs(argv: string[]): PirunArgs {
+	// --help anywhere (before a literal --) is a plea for help, never an error.
+	for (const token of argv) {
+		if (token === '--') break;
+		if (token === '--help' || token === '-h') return { command: 'help', positional: [], flags: new Map() };
+	}
 	const command = argv[0] ?? 'help';
 	const positional: string[] = [];
 	const flags = new Map<string, string | true>();

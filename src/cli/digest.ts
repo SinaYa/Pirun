@@ -13,7 +13,7 @@ export interface ToolUse {
 }
 
 export interface Digest {
-	status: 'ok' | 'empty' | 'failed' | 'running' | 'timeout' | 'interrupted';
+	status: 'ok' | 'empty' | 'failed' | 'denied' | 'running' | 'timeout' | 'interrupted';
 	sessionId: string;
 	turns: number;
 	retries: number;
@@ -169,6 +169,9 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 	if (!meta.finishedAt) return digest;
 	if (meta.timedOut) digest.status = 'timeout';
 	else if (meta.interrupted && !resultStatus) digest.status = 'interrupted';
+	// A contentless run whose actions were denied is a permission ask, not a
+	// provider failure — retrying it unchanged would loop forever.
+	else if (digest.permissionAsks.length && !digest.text) digest.status = 'denied';
 	else if (meta.exitCode !== 0 || (resultStatus && resultStatus !== 'SUCCESS') || digest.errors.length) {
 		digest.status = 'failed';
 	} else if (!resultStatus || !digest.text) digest.status = 'empty';

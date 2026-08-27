@@ -99,7 +99,10 @@ signed in.
 
 ## Storage and development
 
-Runs live in `.runs/`; finished one-shots and orphaned sessions are pruned
+All state — presets, runs, profiles — lives in the machine-global Pirun home
+(`%LOCALAPPDATA%\Pirun`, or `~/.local/state/pirun`), never in this folder:
+the clone is replaceable without losing anything. Finished one-shots and
+orphaned sessions are pruned
 after 30 days (`PIRUN_RETENTION_DAYS`) or 1024 MB (`PIRUN_MAX_STORAGE_MB`);
 active-agent history is kept. `pirun retire`/`clean` remove the rest.
 
