@@ -98,8 +98,10 @@ Persistent preset options (accepted by every preset command):
                                    alternatives; denied actions surface in the
                                    digest as permission asks
   --prefix "<text>" | --prefix-file <path|-> | --no-prefix
-                                   text prepended to every prompt of this
-                                   preset; "-" reads it from stdin
+                                   standing text opening the first prompt of
+                                   each fresh context (every run, an agent's
+                                   first turn — never repeated on follow-ups);
+                                   "-" reads it from stdin
   --dir <path>                     working directory for the preset's runs
   --antigravity-agent <name>       Antigravity persona for this preset
   --tools|--no-tools --context-files|--no-context-files

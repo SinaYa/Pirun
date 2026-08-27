@@ -68,7 +68,9 @@ Credentials live in one machine-global store
 - `--model` resolves any unambiguous fragment against the provider catalog;
   `pirun models <preset> --refresh` pulls the live `/models` list. `--effort
   off|min|low|medium|high|max|<n>k` is stored intent, mapped per model/harness
-  at call time. `--prefix` persists standing instructions per preset.
+  at call time. `--prefix` persists standing instructions per preset,
+  delivered once on each fresh context's first prompt (never repeated on an
+  agent's follow-up turns).
 - `--permissions read|ask|edit|all` — what the agent may do without a grant,
   mapped per harness (Antigravity: plan / accept-edits / skip-permissions;
   Pi: tool scopes). Default `edit`. Denied actions surface in the digest as

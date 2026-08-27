@@ -97,10 +97,12 @@ profile aside recoverably.
   relative paths in the task resolve there, and files it creates land there.
   Defaults to the invocation cwd — set it explicitly; your own cwd is
   rarely the work area. Persists into the preset like every other setting.
-- `--prefix "…"` / `--prefix-file <path|->` / `--no-prefix` — text prepended
-  to every prompt of the preset; `-` reads it from stdin
-  (`echo rules | pirun config p --prefix-file -`), no temp file. Put standing
-  instructions here once instead of repeating them per task.
+- `--prefix "…"` / `--prefix-file <path|->` / `--no-prefix` — standing text
+  that opens the FIRST prompt of every fresh context: each one-shot `run`,
+  and a named agent's first turn. Follow-up turns and forked children never
+  repeat it — their context already holds it. `-` reads it from stdin
+  (`echo rules | pirun config p --prefix-file -`), no temp file. Put
+  standing instructions here once instead of repeating them per task.
 
 ## Timers — required, never persisted
 

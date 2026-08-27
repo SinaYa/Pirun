@@ -37,8 +37,15 @@ import {
 	startSupervisor
 } from './spawn.ts';
 
-export function readTask(args: Args): string {
-	const prefix = state.preset.prefix?.trim();
+/**
+ * The preset prefix is standing context, delivered once per agent context:
+ * it opens the FIRST prompt a fresh context receives (every one-shot run, a
+ * named agent's first turn). Follow-up turns and forked children continue a
+ * context that already holds it — repeating it would bloat every turn and
+ * break the provider's prefix cache.
+ */
+export function readTask(args: Args, options: { prefix?: boolean } = {}): string {
+	const prefix = options.prefix === false ? '' : state.preset.prefix?.trim();
 	const withPrefix = (task: string) => (prefix ? `${prefix}\n\n${task}` : task);
 	const inline = flagString(args, 'task');
 	if (inline) return withPrefix(inline);
@@ -93,7 +100,9 @@ export async function commandAgent(args: Args) {
 	if (!name) die('usage: pirun agent <preset> <name> <task…>');
 	if (!validAgentName(name)) die(`"${name}" is not a usable agent name (letters, digits, . _ -).`);
 
-	const task = readTask({ ...args, positional: args.positional.slice(1) });
+	// Only a brand-new agent gets the prefix; an existing one already carries
+	// it in its remembered context.
+	const task = readTask({ ...args, positional: args.positional.slice(1) }, { prefix: !readAgent(name) });
 	const lockToken = lockAgent(name);
 	let meta: JobMeta;
 	try {
@@ -157,7 +166,8 @@ export async function commandFork(args: Args) {
 		die(`agent "${parentName}" belongs to preset "${parent.preset}", not "${state.presetName}".`);
 	}
 	if (!parent.sessionId) die(`agent "${parentName}" has no session yet — give it a task first.`);
-	const task = readTask({ ...args, positional: args.positional.slice(2) });
+	// A fork inherits the parent's context, prefix included — never re-send it.
+	const task = readTask({ ...args, positional: args.positional.slice(2) }, { prefix: false });
 	const lockToken = lockAgent(childName);
 	let meta: JobMeta;
 	try {

@@ -48,9 +48,12 @@ frozen legacy and still contains the proxy's home docs.
    per preset and mapped per model/harness at call time (Pi `--thinking`,
    Antigravity `--effort`). Safe on knobless models; digest notes when ignored.
 9. **Prompt prefix.** `--prefix`/`--prefix-file <path|->`/`--no-prefix`
-   persist text prepended to every prompt of a preset — standing instructions
-   live there, not in every task. Lives on the preset, not the named agent.
-   `-` reads stdin (no temp file); stdin can carry prefix OR task, never both.
+   persist standing text delivered ONCE per fresh context: it opens the first
+   prompt of every one-shot run and a named agent's first turn; follow-up
+   turns and forked children never repeat it — their context already holds
+   it (user decision 2026-08-27; was every-prompt before). Lives on the
+   preset, not the named agent. `-` reads stdin (no temp file); stdin can
+   carry prefix OR task, never both.
 10. **Timers are required and never persisted.** One flag,
     `--time <return-after>/<timeout>`, on every run/agent/fork/start. No
     defaults ever — the AI must consciously choose. Meaning (user's framing):

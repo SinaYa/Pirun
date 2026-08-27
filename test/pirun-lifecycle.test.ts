@@ -116,6 +116,36 @@ test('the hard timeout remains independent of the caller timer', () => {
 	}
 });
 
+test('the prefix opens only the first prompt of a fresh context', () => {
+	const name = `prefixed-${randomBytes(4).toString('hex')}`;
+	const agentDir = resolve(runsDir, 'agents', name);
+	const ids: string[] = [];
+	try {
+		pirun(['config', '--prefix', 'STANDING RULE.']);
+
+		// A one-shot run is always a fresh context: prefixed.
+		const oneShot = pirun(['run', '--model', 'muse', '--time', '5/10', 'FAKE_FAST']);
+		ids.push(runId(oneShot));
+		assert.match(readFileSync(resolve(runsDir, ids[0], 'task.md'), 'utf8'), /^STANDING RULE\.\n\nFAKE_FAST/);
+
+		// Agent turn 1 starts the context: prefixed.
+		const first = pirun(['agent', name, '--model', 'muse', '--time', '5/10', 'FAKE_FAST']);
+		ids.push(runId(first));
+		assert.equal(first.status, 0, first.stdout + first.stderr);
+		assert.match(readFileSync(resolve(runsDir, ids[1], 'task.md'), 'utf8'), /^STANDING RULE\.\n\nFAKE_FAST/);
+
+		// Turn 2 continues a context that already holds it: never repeated.
+		const second = pirun(['agent', name, '--time', '5/10', 'FAKE_FAST']);
+		ids.push(runId(second));
+		assert.equal(second.status, 0, second.stdout + second.stderr);
+		assert.doesNotMatch(readFileSync(resolve(runsDir, ids[2], 'task.md'), 'utf8'), /STANDING RULE/);
+	} finally {
+		pirun(['config', '--no-prefix']);
+		for (const id of ids) cleanupRun(id);
+		if (existsSync(agentDir)) rmSync(agentDir, { recursive: true, force: true });
+	}
+});
+
 test('a named agent remains locked during handoff and absorbs the detached result', () => {
 	const name = `lifecycle-${randomBytes(4).toString('hex')}`;
 	const started = pirun(['agent', name, '--model', 'muse', '--time', '1/10', 'FAKE_SLOW']);
