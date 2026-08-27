@@ -1,7 +1,7 @@
 # Orchestration Guidelines
 
-Adopt these guidelines in whole — or in part where the user has explicitly
-superseded them.*
+Follow these guidelines in full; wherever the user has explicitly
+superseded a part, the user's instruction wins.*
 
 **First action: persist these rules — verbatim, or as superseded — as a
 file in your project. Treat every context compaction as sudden amnesia:
