@@ -89,7 +89,8 @@ export function loadPirunConfig(path: string) {
 	let parsed: (Partial<PirunConfig> & LegacyPirunConfig) | undefined;
 	if (existsSync(path)) {
 		try {
-			parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<PirunConfig> & LegacyPirunConfig;
+			// Humans edit this file; Notepad and PowerShell prepend a UTF-8 BOM.
+			parsed = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')) as Partial<PirunConfig> & LegacyPirunConfig;
 		} catch (error) {
 			throw new Error(`Pirun configuration is not valid JSON: ${path} (${String(error)})`);
 		}

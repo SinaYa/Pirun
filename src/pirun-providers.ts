@@ -76,7 +76,8 @@ export function loadProvidersStore(path = providersStorePath()): ProvidersStore 
 	if (!existsSync(path)) return store;
 	let parsed: Partial<ProvidersStore>;
 	try {
-		parsed = JSON.parse(readFileSync(path, 'utf8')) as Partial<ProvidersStore>;
+		// Humans edit this file; Notepad and PowerShell prepend a UTF-8 BOM.
+		parsed = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, '')) as Partial<ProvidersStore>;
 	} catch (error) {
 		throw new Error(`Pirun provider store is not valid JSON: ${path} (${String(error)})`);
 	}
