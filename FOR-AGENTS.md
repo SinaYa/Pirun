@@ -21,7 +21,9 @@ pirun agent local worker --time 10m/2h "Continue: address the review notes"
 The first launch of a preset must name `--use`; after that it persists.
 
 A named agent remembers its prior turns; reuse one name per subsystem so the
-provider caches the prefix. `pirun run <preset> …` is one-shot with no memory.
+provider can cache the prefix (the digest's `cached=` shows whether it did —
+some providers never report it). `pirun run <preset> …` is one-shot with no
+memory.
 
 Some models queue long for provider capacity before the first token; a slow
 start is not a model failure — read the progress digest before judging.
@@ -65,8 +67,7 @@ profile aside recoverably.
   files count as edits) → `edit`; anything that must RUN something — tests,
   builds, scripts, shells → `all`. Unsure between `edit` and `all` on a
   trusted task? Pick `all`: too low costs a `DENIED` launch, too high costs
-  nothing — and harness file tools occasionally fail transiently, whereupon
-  agents fall back to shell commands that only `all` permits. Ladder sharp
+  nothing. Ladder sharp
   edges: `edit` allows NO commands, not even read-only ones; on some
   harnesses `read` maps to a plan mode that can deny even file reads
   headlessly. For a **guaranteed** read-only review, remove the
@@ -170,17 +171,23 @@ Do not spend a run on a smoke test first; run the actual task.
 - `EMPTY` — provider ended without an answer; retry. Not a capability verdict.
 - `DENIED` — the run produced nothing because its actions were denied at the
   `--permissions` level. Do NOT retry unchanged (it will loop): widen the
-  level with the printed command, or rephrase the task within it.
+  level with the printed command, or rephrase the task within it. One
+  exception, stated by the digest itself: a `note:` naming a transient
+  file-tool race means one unchanged rerun is the correct move.
 - `TIMEOUT` — it ran past your something-is-wrong threshold. Inspect the log
   before retrying; do not just retry with a bigger number.
 - `FAILED` — read the `error:` lines; they carry the provider's own message.
 - `permission:` lines — the agent asked for something its `--permissions`
   level denies. Not a malfunction: decide whether to widen the preset (the
   exact command is printed) or rephrase the task within the level.
-- `note: answer truncated (N chars)` — the digest caps long answers at 2000
-  chars; the printed `pirun poll <preset> <id> --answer` prints the complete
-  response text alone (no digest header), ready to redirect into a file.
-  Never ship a capped answer as the deliverable.
+- `note: answer truncated below — full N bytes: …` — the digest caps long
+  answers at 2000 chars; the named `pirun poll <preset> <id> --answer`
+  prints the complete response text alone (exactly N bytes incl. one
+  trailing newline — verify your capture against it). Never ship a capped
+  answer as the deliverable. Capture pattern:
+  `pirun poll <preset> <id> --answer > out.md` — but PowerShell `>` writes
+  a BOM; for byte-exact files redirect via `cmd /c` or use
+  `Set-Content -Encoding utf8NoBOM`.
 - `tools:` trace — a `!` prefix marks a failed tool call. A run that still
   says `OK` recovered (often via a fallback visible right after); judge by
   the status and the answer, not by `!` entries.

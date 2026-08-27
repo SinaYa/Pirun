@@ -61,8 +61,13 @@ test('run args follow normal agy CLI usage', () => {
 			'--add-dir', 'D:\\work\\project',
 			'--mode', 'accept-edits'
 		]);
-		// No permission args = agy's own default policy, nothing injected.
-		assert.ok(!antigravityRunArgs({ profileDir: dir, timeoutSec: 5 }).includes('--mode'));
+		// A continuation must reuse its conversation's project, never make one.
+		assert.ok(!args.includes('--new-project'));
+		// No permission args = agy's own default policy, nothing injected; and a
+		// fresh conversation gets its own project (write_to_file race, see source).
+		const fresh = antigravityRunArgs({ profileDir: dir, timeoutSec: 5 });
+		assert.ok(!fresh.includes('--mode'));
+		assert.ok(fresh.includes('--new-project'));
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

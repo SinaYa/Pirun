@@ -160,10 +160,47 @@ it makes `edit` risky for file-writing tasks (shell fallback needs `all`).
 - LIMITATIONS: agy transient artifact-path rejection entry.
 - Unit tests: --answer verbatim emit; note text updated. 71 tests pass.
 
-## Next: round 4 (Opus threads; probe the new fixes + untested surface)
+## Round 4 (cycle-1 validation + new surface) — 4/4 success, 1 wasted launch
 
-Purge `r3*` first. Variants: a build-and-run task (does the task-shape rule
-end permission hesitation?); a verbatim long-answer capture (do threads
-reach --answer directly?); an account-selection-by-headroom task via
-`pirun spend` (untested surface); a two-turn persistent agent + retire
-lifecycle (untested since r1).
+A stack+tests (must run commands): first-launch OK — task-shape rule read,
+`all` chosen without hesitation, load-bearing (file-tool race hit, shell
+fallback needed). B 25-pair FAQ capture: `--answer` found via the note,
+byte-verbatim file, zero retries; flagged note-after-excerpt ordering,
+chars-vs-bytes doubt, missing capture example. C spend-based account pick:
+one `spend antigravity --json` answered both accounts; BUT the task-shape
+headline ("file work → edit") sent it to `edit`, the file-tool race hit,
+shell fallback denied → the round's one wasted launch (rule contradicted
+its own flake warning). D two-turn agent memory + retire: memory,
+bookkeeping, retire all worked; flagged `ctx 59.0k/0 ( 0%)` zero-window
+rendering and `cached=0` vs the runbook's caching claim.
+
+Two-sided investigation nailed the big one: the "transient" agy write
+failure is a FIRST-WRITE race (~7/10 conversations), an identical retry
+always succeeds, `-p` mode + a project looked clean but `-p` cannot take
+stdin, and neither `--new-project` nor a delayed first message eliminates
+it under stream-json (pirun's mode). Full probe data 2026-08-27.
+
+## Fixes shipped from round 4 (cycle 2)
+
+- `--new-project` on every fresh antigravity conversation (all clean probe
+  cells involved it; ~21KB/run; continuations keep their project).
+- Self-healing DENIED: when the denial is the file-tool race (artifact-path
+  error → denied shell fallback), the digest says so and licenses ONE
+  unchanged rerun — FOR-AGENTS DENIED bullet carries the exception.
+  Verified on the real failed run.
+- Truncation note moved BEFORE the excerpt and states the exact byte count
+  `--answer` emits; FOR-AGENTS adds the capture pattern + PowerShell-BOM
+  warning.
+- `agents` renders unknown context windows as `ctx 59.0k/?` (no fake 0%).
+- Runbook caching claim softened ("where the provider reports it");
+  LIMITATIONS: agy cache_read_tokens=0 on genuine continuations; the
+  file-tool-race entry rewritten with probe data and mitigation.
+- 71 tests pass; race note verified live.
+
+## Next: round 5 (cycle-3 pass)
+
+Purge `r5*` after. Variants target: an edit-level file task (does the
+self-healing DENIED note convert the race into one informed rerun?); a
+long-answer capture (is the relocated byte-count note + pattern followed
+cleanly?); a fork task on antigravity (error quality for unsupported
+forking — untested surface); a kill + re-run flow (untested surface).

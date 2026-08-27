@@ -44,6 +44,11 @@ TTL hint, no way to ask a provider to keep a prefix warm. Prefix caching is
 implicit and best-effort, which is why `pirun` pins an agent's model —
 switching models mid-session silently discards the prefix.
 
+Antigravity reports a `cache_read_tokens` field but it has been observed as
+`0` even on a genuine continuation whose second turn re-billed the full
+history (UXA round 4, 105k input, cached=0). Whether the backend caches and
+does not report it, or does not cache, is not observable from the CLI.
+
 ---
 
 ## Context windows are declared, not measured
@@ -99,20 +104,20 @@ different levels, so pirun cannot seed them per run).
 
 ---
 
-## Antigravity's file tools can transiently reject valid workspace paths
+## Antigravity's first write_to_file raced without a project — mitigated
 
-Observed live (agy 1.1.21, UXA round 3, runs `ac8ac7` vs `d18ab8`): two runs
-issued byte-equivalent `write_to_file` calls with absolute paths inside the
-registered workspace (`--add-dir` was set); one succeeded, the other errored
-"…is not a valid artifact path; artifacts must be in <profile brain dir>" and
-the agent recovered by writing via a shell command. No rule explains the
-difference. Consequence: on file-writing tasks, `--permissions edit` can fail
-where `all` succeeds — not because editing is disallowed, but because the
-recovery path (a shell) is. The digest marks the failed call with a `!` prefix
-and stays `OK` when the agent recovered.
-
-**To fix:** upstream agy; pirun already passes the workspace and cannot
-influence the tool-call validation.
+Observed live (agy 1.1.21, UXA rounds 3–4): without a project, the FIRST
+`write_to_file` of a conversation failed agy's permission-declaration layer
+("…is not a valid artifact path; artifacts must be in <profile brain dir>")
+in ~7 of 10 observed conversations, with byte-equivalent calls succeeding in
+others and an immediate identical retry succeeding (probed directly). Agents
+usually recovered via shell commands — which `--permissions edit` denies, so
+`edit` file tasks could DENY spuriously. **Mitigation shipped 2026-08-27:**
+pirun passes `--new-project` on every fresh conversation (0/3 failures in the
+probe arm; ~21KB profile cost per project); continuations keep their
+conversation's project. If the digest still shows `!write_to_file` followed
+by a shell fallback, that is this race; an unchanged rerun is fine.
+Version-sensitive — revalidate on agy upgrades.
 
 ---
 

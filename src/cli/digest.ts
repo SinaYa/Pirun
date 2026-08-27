@@ -107,6 +107,7 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 	const digest = emptyDigest();
 	if (meta.supervisorError) digest.errors.push(meta.supervisorError);
 	let resultStatus = '';
+	let fileToolRace = false;
 	const seenTools = new Set<string>();
 	const seenErrors = new Set(digest.errors);
 	if (existsSync(eventsPath)) {
@@ -143,6 +144,9 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 							const ask = `${name}${hint ? `(${hint})` : ''}`;
 							if (!digest.permissionAsks.includes(ask)) digest.permissionAsks.push(ask);
 						}
+						// agy's known first-write race (see LIMITATIONS): the
+						// file tool errors spuriously, agents fall back to shell.
+						if (/is not a valid artifact path/.test(errorMessage)) fileToolRace = true;
 					}
 				}
 			}
@@ -170,8 +174,17 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 	if (meta.timedOut) digest.status = 'timeout';
 	else if (meta.interrupted && !resultStatus) digest.status = 'interrupted';
 	// A contentless run whose actions were denied is a permission ask, not a
-	// provider failure — retrying it unchanged would loop forever.
-	else if (digest.permissionAsks.length && !digest.text) digest.status = 'denied';
+	// provider failure — retrying it unchanged would loop forever. Exception:
+	// when the denial only happened because the harness file tool raced and
+	// the agent fell back to a (denied) shell, one unchanged rerun IS the fix.
+	else if (digest.permissionAsks.length && !digest.text) {
+		digest.status = 'denied';
+		if (fileToolRace) {
+			digest.notes.push(
+				'the harness file tool failed on a known transient race and the shell fallback was denied — one unchanged rerun is likely to succeed (or widen --permissions)'
+			);
+		}
+	}
 	else if (meta.exitCode !== 0 || (resultStatus && resultStatus !== 'SUCCESS') || digest.errors.length) {
 		digest.status = 'failed';
 	} else if (!resultStatus || !digest.text) digest.status = 'empty';

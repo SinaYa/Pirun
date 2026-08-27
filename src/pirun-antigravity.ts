@@ -160,7 +160,14 @@ export function antigravityRunArgs(options: {
 		'--print-timeout',
 		`${options.timeoutSec}s`
 	];
+	// A fresh conversation gets its own agy project: without one, the first
+	// write_to_file of a conversation fails a permission-declaration race
+	// ("not a valid artifact path…") ~2/3 of the time — probed live 2026-08-27,
+	// 0/3 failures with --new-project vs 3/4 without (agy 1.1.21). Agents then
+	// fall back to shell commands, which --permissions edit denies.
+	// Continuations keep the project their conversation already has.
 	if (options.conversationId) args.push('--conversation', options.conversationId);
+	else args.push('--new-project');
 	if (options.model && options.model !== 'auto') args.push('--model', options.model);
 	if (options.effort) args.push('--effort', options.effort);
 	if (options.agent) args.push('--agent', options.agent);

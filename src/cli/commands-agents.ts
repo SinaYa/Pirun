@@ -50,9 +50,10 @@ export function commandAgents(args: Args) {
 		out(`${agent.name}  ${agent.model}${stats.busy ? '  [busy]' : ''}`);
 		out(`  dir        ${agent.cwd}`);
 		out(`  exchanges  ${agent.exchanges}   last active ${age} ago`);
+		// An unknown window must read as unknown — "/ 0 (0%)" looks like data.
 		out(
-			`  context    ${humanTokens(stats.used)} / ${humanTokens(stats.window)}` +
-				`  (${stats.usedPercent}% used, ${humanTokens(stats.headroom)} left)`
+			`  context    ${humanTokens(stats.used)} / ${stats.window ? humanTokens(stats.window) : '?'}` +
+				(stats.window ? `  (${stats.usedPercent}% used, ${humanTokens(stats.headroom)} left)` : '  (window not in catalog)')
 		);
 		out(
 			`  tokens     in ${humanTokens(agent.totals.input)} uncached · ` +
@@ -71,9 +72,11 @@ export function commandAgents(args: Args) {
 	}
 	for (const agent of agents) {
 		const stats = agentStats(agent);
+		const window = stats.window ? humanTokens(stats.window) : '?';
+		const usedPct = stats.window ? ` (${String(stats.usedPercent).padStart(3)}%)` : '';
 		out(
 			`${agent.name.padEnd(16)} x${String(agent.exchanges).padEnd(3)} ` +
-				`ctx ${(humanTokens(stats.used) + '/' + humanTokens(stats.window)).padStart(14)} (${String(stats.usedPercent).padStart(3)}%)  ` +
+				`ctx ${(humanTokens(stats.used) + '/' + window).padStart(14)}${usedPct}  ` +
 				`in=${humanTokens(agent.totals.input).padStart(6)} cached=${humanTokens(agent.totals.cached).padStart(6)} (${String(stats.hitPercent).padStart(3)}%) ` +
 				`out=${humanTokens(agent.totals.output).padStart(6)}${stats.busy ? '  [busy]' : ''}`
 		);

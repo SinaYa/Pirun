@@ -68,18 +68,20 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 	out(`events: ${resolve(jobDir(meta.id), 'events.jsonl')}`);
 
 	if (digest.text) {
-		out('---');
-		// The answer is the payload: cap its length but keep its line structure.
-		if (options.full || digest.text.length <= 2000) out(digest.text);
-		else {
-			out(`${digest.text.slice(0, 2000)}…`);
-			// A clipped deliverable must never look complete: name the exact
-			// command that prints all of it.
+		const clipped = !options.full && digest.text.length > 2000;
+		// A clipped deliverable must never look complete: warn BEFORE the
+		// excerpt (a top-down reader may never reach a trailing note) and name
+		// the exact command plus the exact byte count --answer will emit, so a
+		// captured file can be verified without char-vs-byte doubt.
+		if (clipped) {
 			out(
-				`note: answer truncated (${digest.text.length} chars) — ` +
-					`full: pirun poll ${meta.preset ?? state.presetName} ${meta.id} --answer`
+				`note: answer truncated below — full ${Buffer.byteLength(digest.text, 'utf8') + 1} bytes: ` +
+					`pirun poll ${meta.preset ?? state.presetName} ${meta.id} --answer`
 			);
 		}
+		out('---');
+		// The answer is the payload: cap its length but keep its line structure.
+		out(clipped ? `${digest.text.slice(0, 2000)}…` : digest.text);
 	}
 }
 

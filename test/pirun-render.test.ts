@@ -40,10 +40,12 @@ const meta = {
 	returnAfterSec: 10
 };
 
-test('a clipped answer always carries the truncation note with the exact --full command', () => {
+test('a clipped answer carries the truncation note before the excerpt, with exact bytes', () => {
 	const digest = { ...emptyDigest(), status: 'ok', text: 'x'.repeat(7900) };
 	const text = captured(() => renderDigest(meta, digest, { full: false }));
-	assert.match(text, /…\nnote: answer truncated \(7900 chars\) — full: pirun poll demo ab12cd --answer/);
+	// 7900 ascii chars + the trailing newline --answer appends = 7901 bytes,
+	// and the note precedes the --- excerpt so a top-down reader sees it first.
+	assert.match(text, /note: answer truncated below — full 7901 bytes: pirun poll demo ab12cd --answer\n---\n/);
 
 	// --full prints everything and must not warn.
 	const full = captured(() => renderDigest(meta, digest, { full: true }));
