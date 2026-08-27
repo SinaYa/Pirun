@@ -1,9 +1,10 @@
 # Pirun handoff
 
-Last updated: 2026-08-27. Read this first in a new chat. It records the user's
-intent and every standing decision. Supersedes `PIRUN-HANDOFF.md` (kept as
-history of the v1 phase). Current usage reference: `README.md`,
-`FOR-AGENTS.md`.
+Last updated: 2026-08-27. Read this first in a new chat — then `UXA-FINDINGS.md`
+(test-pass record + the pending, already-approved fix list = the next work
+item). Together they continue the working session losslessly. Records the
+user's intent and every standing decision. Supersedes `PIRUN-HANDOFF.md`
+(v1-phase history). Usage reference: `README.md`, `FOR-AGENTS.md`.
 
 ## What this project is
 
@@ -26,10 +27,12 @@ frozen legacy and still contains the proxy's home docs.
 3. **Two consumption ways.** A harness's own accounts (Antigravity), and
    OpenAI-completions-compatible endpoints. Some harnesses may someday have
    both; `--use` decides.
-4. **Authenticate once, share everywhere.** Providers (endpoints + api keys,
-   harnesses + logins) live in one machine-global store
-   (`%LOCALAPPDATA%\Pirun\providers.json`), never in presets. Presets are
-   pointers: `use`, model, effort, prefix, dir, behavior flags.
+4. **Authenticate once, share everywhere; no state in the repo.** Providers
+   (endpoints + api keys, harnesses + logins), presets, and runs all live in
+   the machine-global state home (`%LOCALAPPDATA%\Pirun`: providers.json,
+   pirun.json, runs\), never in presets and never in the clone — the repo
+   must be replaceable without losing anything. Presets are pointers: `use`,
+   model, effort, permissions, prefix, dir, behavior flags.
 5. **No setup ceremony.** No config command. Every preset command takes the
    preset positionally; settings supplied on a launch persist into it, omitted
    ones load from it. Prompts and `--time` never persist. `pirun config` is
@@ -44,9 +47,10 @@ frozen legacy and still contains the proxy's home docs.
 8. **Effort is intent.** `--effort off|min|low|medium|high|max|<n>k` is stored
    per preset and mapped per model/harness at call time (Pi `--thinking`,
    Antigravity `--effort`). Safe on knobless models; digest notes when ignored.
-9. **Prompt prefix.** `--prefix`/`--prefix-file`/`--no-prefix` persist text
-   prepended to every prompt of a preset — standing instructions live there,
-   not in every task. Lives on the preset, not the named agent.
+9. **Prompt prefix.** `--prefix`/`--prefix-file <path|->`/`--no-prefix`
+   persist text prepended to every prompt of a preset — standing instructions
+   live there, not in every task. Lives on the preset, not the named agent.
+   `-` reads stdin (no temp file); stdin can carry prefix OR task, never both.
 10. **Timers are required and never persisted.** One flag,
     `--time <return-after>/<timeout>`, on every run/agent/fork/start. No
     defaults ever — the AI must consciously choose. Meaning (user's framing):
@@ -61,17 +65,36 @@ frozen legacy and still contains the proxy's home docs.
     - return-after may exceed timeout (stay attached to observe the timeout).
     - `pirun time <preset> <id> +30m` (extend) vs `45m` (set from now): both
       exist so the reference point is in the spelling, never ambiguous.
-11. **Easy account adding.** Windows login opens a separate visible console
-    window so a human can always paste Google's auth code, even when Pirun was
-    invoked by an AI. New Antigravity profiles are seeded
-    `enableTelemetry: false` — the user is unequivocal: no interaction-data
-    sharing by default, ever.
+11. **Easy account adding, pirun's own login UI.** Windows login opens a
+    separate visible console window (paste-ready even when an AI invoked
+    pirun; closes itself on success, stays open on failure). The dialog is
+    pirun's — the harness's interactive UI is never shown to the human. New
+    Antigravity profiles are seeded `enableTelemetry: false` — the user is
+    unequivocal: no interaction-data sharing by default, ever.
 12. **Docs are dense and model-agnostic.** No prose, no bloat; compact but
     complete. `FOR-AGENTS.md` (the pirun runbook) must contain no concrete
     model names or model-behavior advice — placeholders like `<model-id>`
     only. Provider names (deepseek, antigravity…) are fine. It also carries
     ONLY what changes how the orchestrator acts: passive traits (auth
     keep-alive and the like) belong in README/HANDOFF, never there.
+13. **Permissions are intent.** `--permissions read|ask|edit|all` is stored
+    per preset (like effort) and mapped per harness. Default = `edit`, one
+    level above ask-for-everything. A denied action IS the agent asking:
+    digests carry `permission:` lines with the exact widening command,
+    traveling up like response text; contentless denied runs are `DENIED`.
+14. **No default provider.** A fresh preset must name `--use` once (error
+    carries the exact flag). The removed bundled proxy gets no familiarity —
+    the CladGPT proxy is immature; users who want it `provider add` it like
+    any endpoint. `--use bundled` / `--bundled-proxy` give migration errors.
+15. **Distribution plan.** Public GitHub repo, MIT, later. README carries an
+    install sequence an orchestrating AI can execute from the repo link alone
+    (human only points their orchestrator at it). Installing harnesses (agy)
+    is explicitly NOT pirun's concern — never assume, never install.
+16. **UXA is validated empirically.** Improvements are tested by spawning
+    fresh Opus test-user threads that drive pirun blind (methodology in
+    `UXA-FINDINGS.md`); friction counted across independent threads decides
+    priorities. Fix root causes, not symptoms; reject changes that add
+    grammar without removing turns.
 
 ## Hard constraints (do not violate)
 
@@ -118,9 +141,10 @@ frozen legacy and still contains the proxy's home docs.
   denial IS the ask: digests carry `permission:` lines with the exact
   widening command, traveling up like response text. Presets predating the
   feature are stamped `all` (their old semantics); new presets get `edit`.
-  ⚠ Observation to investigate later: an agy `run_command` under
-  skip-permissions reported the profile directory as its cwd, not the run's
-  cwd — check whether agy needs --add-dir/workspace wiring for commands.
+  ⚠ CONFIRMED BUG (UXA round 2): pirun sets agy's process cwd but never its
+  workspace — agents can write into the profile scratch dir ("no active
+  workspace set"). Fix = `--add-dir <cwd>` in spawnAntigravity; pending fix
+  #1 in UXA-FINDINGS.md.
 - **UXA round-1 fixes (2026-08-27, from 4 live Opus-5 test users):** state
   moved to the machine-global home (see below); antigravity effort-suffix
   model ids auto-align with --effort (--effort wins, rewrites the suffix —
@@ -148,8 +172,17 @@ frozen legacy and still contains the proxy's home docs.
 
 ## Current state
 
-- 49 tests pass (`npm test`, which also runs the line-cap guard); `npm run
-  check` syntax-checks every source file and runs the guard.
+- 68 tests pass (`npm test`, which also runs the line-cap guard); `npm run
+  check` syntax-checks every source file and runs the guard. Suites: CLI
+  surface characterization, lifecycle (fake-pi, fully sandboxed), providers,
+  antigravity parsing, login dialog (fake child), keep-alive due-ness,
+  permissions (+DENIED digest), args, time, files, pi-settings, timeouts.
+- **Two UXA test rounds completed** (4 Opus-5 test users each, 8/8 tasks
+  succeeded); exact results, shipped fixes, and the APPROVED pending fix
+  list (agy workspace wiring, truncation notice, models multi-account, docs)
+  live in `UXA-FINDINGS.md` — that is the next work item, then round 3.
+  Round-2 test state (`r2*` presets/runs, `D:\projectx\pirun-uxa-test\`) not
+  yet purged.
 - **Anti-bloat guard**: no source file may exceed 400 lines
   (`scripts/max-lines.mjs`). Enforced in `npm test`, `npm run check`, and a
   pre-commit hook (`.githooks/pre-commit`; `core.hooksPath` is set by npm's
@@ -176,7 +209,8 @@ frozen legacy and still contains the proxy's home docs.
 - Known cosmetic/deferred items: `pirun help` and README examples still name a
   concrete model (`deepseek-chat`) — user wants a placeholder when code is
   next touched; Windows browser auto-open uses `rundll32` (the path that
-  works).
+  works); `pirun config <preset> --json` persists the json flag (one-off
+  JSON reads flip the preset's output mode — unresolved trap).
 
 ## Source map (modularized 2026-08-27; every file ≤ 400 lines)
 
@@ -184,10 +218,12 @@ frozen legacy and still contains the proxy's home docs.
 mutable state, out/die, formatters) · `pi.ts` (Pi discovery, registered-model
 catalogue) · `preset.ts` (configurePreset, flag persistence, model
 resolution) · `store.ts` (jobs, agents, sessions, locks, retention) ·
-`digest.ts` (event stream → digest) · `render.ts` (digest and live-progress
-output) · `auth.ts` (Antigravity login/isolation) · `spawn.ts` (createJob,
-harness spawn, supervisor) · `commands-*.ts` (one file per command family) ·
-`help.ts`.
+`digest.ts` (event stream → digest, permission-ask extraction) · `render.ts`
+(digest and live-progress output) · `auth.ts` (login dialog, isolation) ·
+`spawn.ts` (createJob, harness spawn, supervisor) · `keepalive.ts` (auth
+keep-alive + HARNESS_KEEPALIVE registry) · `permissions.ts` (levels +
+HARNESS_PERMISSIONS registry; both registries assert coverage at import) ·
+`commands-*.ts` (one file per command family) · `help.ts`.
 
 `src/pirun-providers.ts` (store + --use resolution) re-exports
 `src/pirun-provider-catalog.ts` (canonical endpoints, models, effort
@@ -206,9 +242,14 @@ sync) · `pirun-antigravity.ts` · `pirun-provider-net.ts` (spend, /models) ·
 2. ~~**Separate the proxy concern from the Pirun front door**~~ — done
    2026-08-27: the proxy code was deleted from this repo entirely (it lives
    on in CladGPT), not wrapped. See Current state.
-3. Then refactor/code-improvement generally, and eventually more harness CLIs
+3. **Now:** the approved UXA round-2 fix list in `UXA-FINDINGS.md`, then UXA
+   round 3 (same methodology, fresh Opus test users, purge `r2*` state
+   first).
+4. Then refactor/code-improvement generally, and eventually more harness CLIs
    behind an adapter boundary (auth, sessions, forking, tools, providers as
-   explicit capabilities) — with zero change to what harness backends observe.
+   explicit capabilities; keep-alive and permission registries already
+   enforce per-harness declarations) — with zero change to what harness
+   backends observe. Then the public MIT GitHub release (intent 15).
 
 ## Working style the user expects
 
@@ -218,7 +259,15 @@ sync) · `pirun-antigravity.ts` · `pirun-provider-net.ts` (spend, /models) ·
   (`Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`).
 - When they ask a design question, answer compactly ("without prose") and get
   approval before writing files; keep before-copies when they want to review
-  doc rewrites.
+  doc rewrites. When asked to "think again", genuinely re-derive from root
+  causes — they expect proposals to change.
+- Behavior-preserving refactors: characterization tests against the OLD
+  binary first, then move-only changes, full suite green after every split.
+- Investigate before designing: probe the real harness (ordinary CLI usage,
+  file mtimes/names only — never credential contents) and let observed
+  behavior pick the design.
 - Verification habit for a fresh chat: `git log -5 --oneline`,
   `node bin\pirun.ts providers`, and if needed one minimal live run per
   account: `node bin\pirun.ts run antigravity-one --time 2m/5m "Reply with exactly OK."`
+- User messages may arrive mid-task redefining scope (e.g. "make it an
+  enforced requirement…") — fold them in as standing decisions immediately.
