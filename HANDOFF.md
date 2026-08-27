@@ -4,7 +4,10 @@ Last updated: 2026-08-27. Read this first in a new chat — then `UXA-FINDINGS.m
 (test-pass record + the pending, already-approved fix list = the next work
 item). Together they continue the working session losslessly. Records the
 user's intent and every standing decision. Supersedes `PIRUN-HANDOFF.md`
-(v1-phase history). Usage reference: `README.md`, `FOR-AGENTS.md`.
+(v1-phase history). Usage reference: `README.md`, `FOR-AGENTS.md`;
+delegation-strategy prompt shipped for orchestrators: `ORCHESTRATION.md`
+(distilled 2026-08-27 from the user's hand-written prompts on a prior
+project — keep it generic, no model names, no nannying).
 
 ## What this project is
 
@@ -263,7 +266,13 @@ sync) · `pirun-antigravity.ts` · `pirun-provider-net.ts` (spend, /models) ·
    behind an adapter boundary (auth, sessions, forking, tools, providers as
    explicit capabilities; keep-alive and permission registries already
    enforce per-harness declarations) — with zero change to what harness
-   backends observe. Then the public MIT GitHub release (intent 15).
+   backends observe. Includes a **version adaptor** concept (user 2026-08-27,
+   future goal, deliberately NOT in README): route pirun's functionality per
+   detected harness version, since behaviors are version-sensitive (login
+   console handling, token paths, the write_to_file race were each proven on
+   specific agy versions). ~~Public MIT GitHub release~~ — done 2026-08-27
+   (github.com/SinaYa/Pirun; deploy key in `~/.ssh/id_pirun_deploy`, bound
+   via this repo's `core.sshCommand`).
 
 ## Working style the user expects
 

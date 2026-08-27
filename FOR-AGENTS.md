@@ -1,6 +1,8 @@
 # Delegating work through Pirun
 
-Use **`pirun`**, never a harness CLI directly. Setup if missing:
+Use **`pirun`**, never a harness CLI directly. Delegation strategy (turn
+economy, bounded deliverables, parallel fan-out): `ORCHESTRATION.md`,
+optional. Setup if missing:
 
 ```powershell
 node D:\projectx\pirun\bin\install.ts
