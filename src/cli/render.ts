@@ -26,7 +26,12 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 	if (digest.compactions) parts.push(`compacted=${digest.compactions}`);
 	if (digest.cost > 0) parts.push(`$${digest.cost.toFixed(4)}`);
 
-	out(`[${options.label ?? meta.id}] ${digest.status.toUpperCase()}  ${parts.join('  ')}  ${meta.model}`);
+	// Echoing effort next to the model closes the "did my --effort align with
+	// the id's tier?" loop from the output instead of a doc round-trip.
+	out(
+		`[${options.label ?? meta.id}] ${digest.status.toUpperCase()}  ${parts.join('  ')}  ${meta.model}` +
+			`${meta.effort ? `  effort=${meta.effort}` : ''}`
+	);
 
 	if (digest.tools.length) {
 		const rendered = digest.tools
@@ -72,7 +77,7 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 			// command that prints all of it.
 			out(
 				`note: answer truncated (${digest.text.length} chars) — ` +
-					`full: pirun poll ${meta.preset ?? state.presetName} ${meta.id} --full`
+					`full: pirun poll ${meta.preset ?? state.presetName} ${meta.id} --answer`
 			);
 		}
 	}
@@ -157,6 +162,8 @@ function liveProgress(id: string, meta: JobMeta): LiveProgress {
 }
 
 export function emitRunningHandoff(meta: JobMeta, digest: Digest, args: Args) {
+	// --answer on a still-running run: nothing to print; exit code 2 says so.
+	if (args.flags.has('answer')) return;
 	const progress = liveProgress(meta.id, meta);
 	const hardDeadline = meta.deadlineAt ?? (meta.piStartedAt ?? meta.startedAt) + meta.timeoutSec * 1000;
 	const hardRemaining = Math.max(0, hardDeadline - Date.now());
@@ -179,6 +186,13 @@ export function emitRunningHandoff(meta: JobMeta, digest: Digest, args: Args) {
 }
 
 export function emit(meta: JobMeta, digest: Digest, args: Args, label?: string) {
+	// --answer: the response text alone, complete and verbatim — pipe it
+	// straight into a file with no digest header to strip. Exit codes still
+	// carry the status.
+	if (args.flags.has('answer')) {
+		if (digest.text) out(digest.text);
+		return;
+	}
 	if (args.flags.has('json')) out(JSON.stringify({ meta, digest }, null, 2));
 	else renderDigest(meta, digest, { full: args.flags.has('full'), label });
 }

@@ -91,10 +91,14 @@ frozen legacy and still contains the proxy's home docs.
     (human only points their orchestrator at it). Installing harnesses (agy)
     is explicitly NOT pirun's concern — never assume, never install.
 16. **UXA is validated empirically.** Improvements are tested by spawning
-    fresh Opus test-user threads that drive pirun blind (methodology in
-    `UXA-FINDINGS.md`); friction counted across independent threads decides
-    priorities. Fix root causes, not symptoms; reject changes that add
-    grammar without removing turns.
+    fresh **Opus 5** test-user threads that drive pirun blind (methodology
+    in `UXA-FINDINGS.md`; never play the test user yourself, that
+    contaminates results); friction counted across independent threads decides
+    priorities. Friction includes hesitation and wrong first guesses, not
+    just failures. Fix root causes, not symptoms; reject changes that add
+    grammar without removing turns. Goals, no compromises among them: it
+    works · fewest orchestrator turns · shortest commands · compact
+    word-dense docs.
 
 ## Hard constraints (do not violate)
 

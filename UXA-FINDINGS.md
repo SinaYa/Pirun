@@ -6,7 +6,14 @@ still owed. Continuation in a fresh session starts at "Next: round 3".
 
 ## Methodology (reusable; the user wants more rounds)
 
-- Test users = Opus 5 subagent threads acting as first-time orchestrators.
+- Test users = fresh Opus 5 subagent threads acting as first-time
+  orchestrators (confirmed 2026-08-27; a brief Fable-5 instruction was
+  retracted as a mistake). Never play the test user yourself — your pirun
+  knowledge contaminates the results.
+- Friction signal = not only failures: count turns spent re-reading docs,
+  hesitation visible in cmds.md ordering, and wrong first guesses that the
+  thread later corrected. Investigate the thread's turns AND, when needed,
+  the delegated agents' event streams.
   Briefing contains ONLY: the repo path, "runbook: FOR-AGENTS.md", invocation
   (`node D:\projectx\pirun\bin\pirun.ts …`), one task, the account + model
   family + effort to use, a name token (`uxaN`/`r2x`) for presets/agents,
@@ -114,11 +121,49 @@ Parked design ideas (user judgment, not bugs): permission tier "commands
 scoped to --dir" (A) · multi-run `wait` (B) · tool-enforced file ownership
 (B) · `--out <file>` clean answer capture (D).
 
-## Next: round 3
+## Round 3 (validation of the round-2 fixes) — 4/4 first-launch, 0 wasted runs
 
-Purge `r2*` state first (protocol above), then 4 fresh Opus test users on
-new task variants targeting the shipped fixes: a --dir-relative file task
-with NO absolute paths in the prompt (acid test for #1, now expected to
-pass); a long-deliverable task that must survive >2000 chars (#2); a
-fresh-perspective model-discovery task with two accounts and no default
-(#3); a guaranteed read-only review using the documented recipe (#4).
+Tasks/results: A workspace acid test (relative-path files via --dir, no
+absolute paths in the prompt) — PASSED, files landed in --dir; B 40-entry
+glossary >2000 chars — truncation note seen and used, capture verbatim
+(14152 chars); C no-preset model discovery, two accounts, no default —
+`models antigravity` fallback worked, 3 commands total; D guaranteed
+read-only review — recipe followed from docs alone, `tools: none` quoted as
+proof, hash byte-identical, all 3 planted flaws found (+ extra real ones).
+Every round-2 fix was load-bearing in the field.
+
+Friction by independent-thread count (nobody failed; counted hesitations):
+permissions ladder forces defensive `all` / task-shape unclear 2/4 (A, C) ·
+effort/id alignment needed a doc re-read, digest silent about it 2/4 (B, C)
+· no answer-only capture, hand-split on `---` 2/4 (B, D; + r2-D = 3 threads
+total) · `!` tool-glyph undocumented 1/4 (A, cost a verification pass) ·
+PowerShell styles stderr red, reads as failure 1/4 (D, doubted twice) ·
+`--time` magnitude guesswork 1/4 (A; fix stays REJECTED) · catalog
+version-vs-tier axes un-annotated 1/4 (C; parked — labels come from agy).
+Pirun-side discovery: run `ac8ac7` — agy transiently rejected a valid
+workspace-absolute `write_to_file` ("not a valid artifact path"), recovered
+via shell; identical call succeeded in `d18ab8` → LIMITATIONS.md entry, and
+it makes `edit` risky for file-writing tasks (shell fallback needs `all`).
+
+## Fixes shipped from round 3 (cycle 1 of the autonomous UXA loop)
+
+- `--answer` on poll/wait: prints the complete response text alone —
+  nothing to strip, pipe straight to a file; running run prints nothing
+  (exit 2). Truncation note now names `--answer` instead of `--full`.
+- Digest header echoes `effort=<x>` after the model id — alignment
+  confirmed from output, no doc trip.
+- FOR-AGENTS: task-shape→permissions rule (analysis→--no-tools, file
+  work→edit, must-run-anything→all; when unsure on a trusted task pick all
+  — DENIED costs a launch, plus harness file tools can transiently fail and
+  the shell fallback needs all) · `!` glyph documented · stderr/PowerShell
+  styling note · `--answer` in the commands table.
+- LIMITATIONS: agy transient artifact-path rejection entry.
+- Unit tests: --answer verbatim emit; note text updated. 71 tests pass.
+
+## Next: round 4 (Opus threads; probe the new fixes + untested surface)
+
+Purge `r3*` first. Variants: a build-and-run task (does the task-shape rule
+end permission hesitation?); a verbatim long-answer capture (do threads
+reach --answer directly?); an account-selection-by-headroom task via
+`pirun spend` (untested surface); a two-turn persistent agent + retire
+lifecycle (untested since r1).

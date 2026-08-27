@@ -26,9 +26,11 @@ provider store, not in presets — authenticate once, use from any preset.
                                    one-shot, no memory; for throwaway work
   pirun start <preset> --time <ra>/<to> <task…>
                                    one-shot, detached; prints a run id
-  pirun poll <preset> [id] [--full|--json]
-                                   digest for a run (default: the most recent)
-  pirun wait <preset> [id] [--time <dur>]
+  pirun poll <preset> [id] [--full|--answer|--json]
+                                   digest for a run (default: the most recent);
+                                   --answer prints only the complete response
+                                   text, ready to redirect into a file
+  pirun wait <preset> [id] [--time <dur>] [--full|--answer|--json]
                                    re-attach to a run for up to <dur> (default 10m)
   pirun time <preset> [id] [+30m|45m]
                                    show or move a live run's hard stop:

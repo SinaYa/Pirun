@@ -60,10 +60,16 @@ profile aside recoverably.
   becomes the stored effort, and a later `--effort` rewrites the id's tier —
   set either, never worry about both.
 - `--permissions read|ask|edit|all` — what the agent may do without a grant,
-  mapped to each harness's own mechanism (default `edit`). Know the ladder's
-  sharp edges: `edit` allows file edits but NO commands, not even read-only
-  ones; on some harnesses `read` maps to a plan mode that can deny even file
-  reads headlessly. For a **guaranteed** read-only review, remove the
+  mapped to each harness's own mechanism (default `edit`). Pick by task
+  shape: answer/analysis only → `--no-tools`; create or edit files (new
+  files count as edits) → `edit`; anything that must RUN something — tests,
+  builds, scripts, shells → `all`. Unsure between `edit` and `all` on a
+  trusted task? Pick `all`: too low costs a `DENIED` launch, too high costs
+  nothing — and harness file tools occasionally fail transiently, whereupon
+  agents fall back to shell commands that only `all` permits. Ladder sharp
+  edges: `edit` allows NO commands, not even read-only ones; on some
+  harnesses `read` maps to a plan mode that can deny even file reads
+  headlessly. For a **guaranteed** read-only review, remove the
   capability instead of trusting a policy: inline the content in the prompt
   AND pass `--no-tools --no-context-files` — the agent then cannot touch any
   file, and the digest prints `tools: none (disabled with --no-tools)` as
@@ -123,7 +129,7 @@ check-in cadence; timeout = "longer than this can only mean failure."
 | `pirun retire <preset> <name>` / `--all` | remove an idle agent |
 | `pirun run <preset> --time <ra>/<to> <task>` | one-shot task |
 | `pirun start <preset> --time <ra>/<to> <task>` | one-shot, returns immediately after announce |
-| `pirun wait <preset> [id] [--time <dur>]` / `poll` | re-attach / inspect |
+| `pirun wait <preset> [id] [--time <dur>]` / `poll` | re-attach / inspect; `--answer` = response text only, uncapped |
 | `pirun time <preset> <id> [+30m\|45m]` | show / move the hard stop |
 | `pirun jobs <preset>` / `log <id>` / `kill <id>` | list / diagnose / stop runs |
 | `pirun providers [--json]` | all providers, accounts, readiness |
@@ -145,7 +151,9 @@ conversation: state objective, exact files/scope, constraints, completion
 gates. Standing rules belong in the preset's `--prefix`, not in every task.
 
 Quote Windows paths (or use forward slashes) — your shell can eat unquoted
-backslashes before pirun ever sees them.
+backslashes before pirun ever sees them. pirun prints announcements and
+progress to stderr; PowerShell may style that red (`NativeCommandError`).
+Branch on the exit code, never on the styling.
 
 Long tasks go in a file; prompts travel on stdin either way, so quoting,
 newlines, and length are never your problem:
@@ -170,8 +178,12 @@ Do not spend a run on a smoke test first; run the actual task.
   level denies. Not a malfunction: decide whether to widen the preset (the
   exact command is printed) or rephrase the task within the level.
 - `note: answer truncated (N chars)` — the digest caps long answers at 2000
-  chars; the printed `pirun poll <preset> <id> --full` returns every
-  character. Never ship a capped answer as the deliverable.
+  chars; the printed `pirun poll <preset> <id> --answer` prints the complete
+  response text alone (no digest header), ready to redirect into a file.
+  Never ship a capped answer as the deliverable.
+- `tools:` trace — a `!` prefix marks a failed tool call. A run that still
+  says `OK` recovered (often via a fallback visible right after); judge by
+  the status and the answer, not by `!` entries.
 - `INTERRUPTED` — supervision died; inspect `pirun log <preset> <id>`.
 
 Transient provider failures retry automatically (five turn retries unless a

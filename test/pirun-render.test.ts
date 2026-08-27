@@ -5,7 +5,7 @@ import { test } from 'node:test';
 
 process.env.PIRUN_PROVIDERS_PATH = resolve(tmpdir(), 'pirun-render-test-providers.json');
 process.env.PIRUN_RUNS_DIR = resolve(tmpdir(), 'pirun-render-test-runs');
-const { renderDigest } = await import('../src/cli/render.ts');
+const { emit, renderDigest } = await import('../src/cli/render.ts');
 const { emptyDigest } = await import('../src/cli/digest.ts');
 
 // Offline: renderDigest is pure formatting over meta + digest; capture stdout.
@@ -43,7 +43,7 @@ const meta = {
 test('a clipped answer always carries the truncation note with the exact --full command', () => {
 	const digest = { ...emptyDigest(), status: 'ok', text: 'x'.repeat(7900) };
 	const text = captured(() => renderDigest(meta, digest, { full: false }));
-	assert.match(text, /…\nnote: answer truncated \(7900 chars\) — full: pirun poll demo ab12cd --full/);
+	assert.match(text, /…\nnote: answer truncated \(7900 chars\) — full: pirun poll demo ab12cd --answer/);
 
 	// --full prints everything and must not warn.
 	const full = captured(() => renderDigest(meta, digest, { full: true }));
@@ -55,6 +55,15 @@ test('a clipped answer always carries the truncation note with the exact --full 
 		renderDigest(meta, { ...emptyDigest(), status: 'ok', text: 'done' }, { full: false })
 	);
 	assert.ok(!short.includes('answer truncated'));
+});
+
+test('--answer emits the response text alone, complete and verbatim', () => {
+	const digest = { ...emptyDigest(), status: 'ok', text: `line one\n${'y'.repeat(6000)}\n---\nline after separator` };
+	const answerArgs = { command: 'poll', positional: [], flags: new Map([['answer', true]]) };
+	const text = captured(() => emit(meta, digest, answerArgs));
+	// Exactly the answer plus the trailing newline out() appends — no header,
+	// no cap, no truncation note, embedded --- lines untouched.
+	assert.equal(text, `${digest.text}\n`);
 });
 
 test('a --no-tools run prints the tools-disabled proof line', () => {

@@ -99,6 +99,23 @@ different levels, so pirun cannot seed them per run).
 
 ---
 
+## Antigravity's file tools can transiently reject valid workspace paths
+
+Observed live (agy 1.1.21, UXA round 3, runs `ac8ac7` vs `d18ab8`): two runs
+issued byte-equivalent `write_to_file` calls with absolute paths inside the
+registered workspace (`--add-dir` was set); one succeeded, the other errored
+"…is not a valid artifact path; artifacts must be in <profile brain dir>" and
+the agent recovered by writing via a shell command. No rule explains the
+difference. Consequence: on file-writing tasks, `--permissions edit` can fail
+where `all` succeeds — not because editing is disallowed, but because the
+recovery path (a shell) is. The digest marks the failed call with a `!` prefix
+and stays `OK` when the agent recovered.
+
+**To fix:** upstream agy; pirun already passes the workspace and cannot
+influence the tool-call validation.
+
+---
+
 ## Effort-tier model ids can compose a tier a model lacks
 
 Antigravity publishes effort tiers inside model ids, and tiers vary per model
