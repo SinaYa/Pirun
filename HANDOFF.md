@@ -114,13 +114,17 @@ frozen legacy and still contains the proxy's home docs.
   or chat. Presence checks only; never print token files or account
   identities.
 - **Login is pirun's own dialog** (user requirement 2026-08-27): Antigravity's
-  interactive UI must never be shown to the human. agy runs fully piped; pirun
-  scrapes the OAuth URL, opens the browser, relays the pasted code, detects
-  success from the profile on disk, and terminates agy itself — no `/quit`.
-  ⚠ Piped-stdin login is NOT yet validated against a real Google sign-in
-  (needs a human); revalidate like the isolation probe on agy upgrades.
-  Fallback if agy misbehaves with piped stdin: the pre-dialog flow at commit
-  52a6028 (`src/cli/auth.ts`).
+  interactive UI must never be shown to the human. agy's OUTPUT stays piped
+  and hidden; pirun scrapes the OAuth URL, opens the browser, detects success
+  from the profile on disk, and terminates agy itself — no `/quit`. The old
+  piped-stdin warning is RESOLVED (contributor PR #1, 2026-08-27, verified
+  agy 1.1.19): agy's authorization-code reader only reads a real console
+  handle — a code relayed down a stdin pipe is never seen. Login therefore
+  runs agy in print mode with stdin INHERITED when a console exists (the
+  pipe relay remains only for consoleless callers), and auto-retries agy's
+  hard-coded ~60s sign-in links within the 15-minute budget
+  (`isExpiredSignInAttempt`). Revalidate on agy upgrades like the isolation
+  probe.
 - **Auth keep-alive is an enforced per-harness requirement** (user decision
   2026-08-27): every harness in `HARNESS_PROVIDERS` must declare in
   `HARNESS_KEEPALIVE` (src/cli/keepalive.ts) either how its auth is
