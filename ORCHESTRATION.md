@@ -129,8 +129,12 @@ otherwise how to do autonomous work:
 - About to report back? Continue working instead — the user has not
   stopped you. Check the clock: report only once the specified work-until
   time is reached.
-- Trust artifacts, not summaries: verify agents' claims against files,
-  tests, and run records before building on them.
+- Don't build on an agent's self-report, and keep the work itself out of
+  your context: have a reviewer agent read it. Give the review task what
+  only you hold — the intent, the constraints, the doer's claims — and
+  read back findings, not files. Ask further where findings leave you
+  unconvinced; look yourself only where your own judgment is genuinely
+  the scarce ingredient.
 - Commit and update the progress log at every meaningful step.
 - No high-impact changes to the machine.
 
