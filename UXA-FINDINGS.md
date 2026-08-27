@@ -197,10 +197,44 @@ it under stream-json (pirun's mode). Full probe data 2026-08-27.
   file-tool-race entry rewritten with probe data and mitigation.
 - 71 tests pass; race note verified live.
 
-## Next: round 5 (cycle-3 pass)
+## Round 5 (cycle-2 validation + new surface) — 4/4 success, 1 wasted launch
 
-Purge `r5*` after. Variants target: an edit-level file task (does the
-self-healing DENIED note convert the race into one informed rerun?); a
-long-answer capture (is the relocated byte-count note + pattern followed
-cleanly?); a fork task on antigravity (error quality for unsupported
-forking — untested surface); a kill + re-run flow (untested surface).
+A file-only task at least privilege: chose `edit` reasoned from docs,
+first-launch OK (race did not fire; two clean native writes under
+--new-project). B 30-term capture: byte-perfect — digest's stated 10160
+bytes matched `wc -c` exactly, no BOM (redirected via bash after reading
+the warning), zero retries; cycle-2 capture fixes credited by name.
+C fork plan-A/plan-B: fork refused with the prescriptive error (praised),
+plan B (replay priming into a second agent) succeeded; found a REAL DOC
+BUG — `Set-Content -Encoding utf8NoBOM` does not exist in PowerShell 5.1
+(cost the round's only capture-side wasted turn). D start→observe→kill→
+replace: all five steps worked; the `edit` trap fired once more (agent ran
+a `python -c` probe on a pure file task → DENIED), killed runs read
+`FAILED`, and a FAILED run had in fact completed its file (side effects).
+
+Friction tally: `edit` trap (agents run probe commands on file-only tasks)
+1 burned launch + A's doc tension with least-privilege · utf8NoBOM doc bug
+1 wasted turn · fork support not discoverable pre-attempt 1 · --no-tools
+buried mid-paragraph 1 · killed runs render FAILED 1 · FAILED-after-work
+misread 1 · run-vs-agent second pass 2 · "run creates the preset" implicit
+2 · effort echo still lacked an explicit aligned marker 1 · `--time`
+anchor (rejected, stands) 2.
+
+## Fixes shipped from round 5 (cycle 3)
+
+- `KILLED` digest status: `pirun kill` stamps the run; a non-ok outcome
+  renders KILLED, never FAILED (marker survives the supervisor's final
+  write; verified live), FOR-AGENTS entry added.
+- FAILED-after-work note: completed tool calls before a failure print
+  "side effects may exist; inspect before retrying".
+- Fork discoverability: `HARNESS_CAN_FORK` single-sources the fork gate
+  and `pirun providers` now prints `(no forking)` on the harness row and
+  `fork: false` in --json; fork table row points at it.
+- Permissions bullet rewritten from field evidence: `all` for reliability,
+  `edit` for enforced containment (agents habitually run probe commands on
+  file-only tasks), knowingly trading a possible wasted launch.
+- `--no-tools` promoted to its own flag bullet; "any launch command creates
+  the preset" made explicit; utf8NoBOM doc bug fixed (cmd /c or
+  [IO.File]::WriteAllText); effort echo appends `(=id tier)` when the model
+  id encodes the tier.
+- 72 tests pass; KILLED + providers verified live.

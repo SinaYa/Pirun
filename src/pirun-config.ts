@@ -27,6 +27,11 @@ export interface PirunOpenAiApi {
 export const PIRUN_HARNESSES = ['pi', 'antigravity'] as const;
 export type PirunHarness = (typeof PIRUN_HARNESSES)[number];
 
+/** Whether a harness can branch a primed conversation (`pirun fork`). Single
+ *  source for the fork command's gate and the capability shown by
+ *  `pirun providers`, so support is discoverable before the first attempt. */
+export const HARNESS_CAN_FORK: Record<PirunHarness, boolean> = { pi: true, antigravity: false };
+
 interface LegacyAntigravityConfig {
 	effort?: 'low' | 'medium' | 'high';
 	agent?: string;

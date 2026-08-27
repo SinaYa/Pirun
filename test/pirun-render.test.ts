@@ -6,7 +6,9 @@ import { test } from 'node:test';
 process.env.PIRUN_PROVIDERS_PATH = resolve(tmpdir(), 'pirun-render-test-providers.json');
 process.env.PIRUN_RUNS_DIR = resolve(tmpdir(), 'pirun-render-test-runs');
 const { emit, renderDigest } = await import('../src/cli/render.ts');
-const { emptyDigest } = await import('../src/cli/digest.ts');
+const { buildDigest, emptyDigest } = await import('../src/cli/digest.ts');
+const { RUNS_DIR } = await import('../src/cli/context.ts');
+const { mkdirSync, rmSync } = await import('node:fs');
 
 // Offline: renderDigest is pure formatting over meta + digest; capture stdout.
 
@@ -66,6 +68,24 @@ test('--answer emits the response text alone, complete and verbatim', () => {
 	// Exactly the answer plus the trailing newline out() appends — no header,
 	// no cap, no truncation note, embedded --- lines untouched.
 	assert.equal(text, `${digest.text}\n`);
+});
+
+test('a deliberate kill reads KILLED, never FAILED', () => {
+	const id = 'k11ed1';
+	mkdirSync(resolve(RUNS_DIR, id), { recursive: true });
+	try {
+		const base = {
+			id, harness: 'pi', model: 'm', cwd: tmpdir(), task: 't', tools: true,
+			startedAt: Date.now() - 5000, finishedAt: Date.now(),
+			exitCode: 130, timeoutSec: 60, returnAfterSec: 10
+		};
+		assert.equal(buildDigest(id, { ...base, killedAt: Date.now() - 100 }).status, 'killed');
+		// Without the marker the same outcome stays a failure.
+		rmSync(resolve(RUNS_DIR, id, 'digest.json'), { force: true });
+		assert.equal(buildDigest(id, { ...base }).status, 'failed');
+	} finally {
+		rmSync(resolve(RUNS_DIR, id), { recursive: true, force: true });
+	}
 });
 
 test('a --no-tools run prints the tools-disabled proof line', () => {

@@ -58,6 +58,8 @@ export interface JobMeta {
 	piStartedAt?: number;
 	/** A supervised run whose supervisor went away before it could finish. */
 	interrupted?: boolean;
+	/** Set by `pirun kill`: a later non-ok outcome renders as KILLED, not FAILED. */
+	killedAt?: number;
 	supervisorError?: string;
 	noContextFiles?: boolean;
 	label?: string;

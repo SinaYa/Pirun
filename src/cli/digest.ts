@@ -13,7 +13,7 @@ export interface ToolUse {
 }
 
 export interface Digest {
-	status: 'ok' | 'empty' | 'failed' | 'denied' | 'running' | 'timeout' | 'interrupted';
+	status: 'ok' | 'empty' | 'failed' | 'denied' | 'running' | 'timeout' | 'interrupted' | 'killed';
 	sessionId: string;
 	turns: number;
 	retries: number;
@@ -189,8 +189,20 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 		digest.status = 'failed';
 	} else if (!resultStatus || !digest.text) digest.status = 'empty';
 	else digest.status = 'ok';
+	applyKillMarker(digest, meta);
 	atomicWriteJson(digestPath, digest);
 	return digest;
+}
+
+/**
+ * A deliberate `pirun kill` that ended the run is KILLED, never FAILED — a
+ * caller reading FAILED starts diagnosing an error that does not exist. A run
+ * that still completed with output before the kill landed stays what it was.
+ */
+function applyKillMarker(digest: Digest, meta: JobMeta) {
+	if (meta.killedAt && ['failed', 'interrupted', 'empty'].includes(digest.status)) {
+		digest.status = 'killed';
+	}
 }
 
 export function buildDigest(id: string, meta: JobMeta): Digest {
@@ -216,6 +228,7 @@ export function buildDigest(id: string, meta: JobMeta): Digest {
 			else if (meta.interrupted) digest.status = 'interrupted';
 			else if (meta.exitCode !== 0 || digest.errors.length) digest.status = 'failed';
 			else digest.status = 'empty';
+			applyKillMarker(digest, meta);
 			atomicWriteJson(digestPath, digest);
 		}
 		return digest;
@@ -325,6 +338,7 @@ export function buildDigest(id: string, meta: JobMeta): Digest {
 	else if (meta.exitCode !== 0 || digest.errors.length) digest.status = 'failed';
 	else if (!sawAssistantMessage || (!digest.text && !lastAssistantHadTools)) digest.status = 'empty';
 	else digest.status = 'ok';
+	applyKillMarker(digest, meta);
 
 	atomicWriteJson(digestPath, digest);
 	return digest;

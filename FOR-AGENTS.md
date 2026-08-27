@@ -18,7 +18,9 @@ pirun agent local worker --time 10m/2h --use <provider[/account]> --model <model
 pirun agent local worker --time 10m/2h "Continue: address the review notes"
 ```
 
-The first launch of a preset must name `--use`; after that it persists.
+The first launch of a preset must name `--use`; after that it persists. Any
+launch command (`run`/`start`/`agent`/`fork`) creates the preset if missing —
+there is no separate create step.
 
 A named agent remembers its prior turns; reuse one name per subsystem so the
 provider can cache the prefix (the digest's `cached=` shows whether it did —
@@ -63,14 +65,15 @@ profile aside recoverably.
   set either, never worry about both.
 - `--permissions read|ask|edit|all` — what the agent may do without a grant,
   mapped to each harness's own mechanism (default `edit`). Pick by task
-  shape: answer/analysis only → `--no-tools`; create or edit files (new
-  files count as edits) → `edit`; anything that must RUN something — tests,
-  builds, scripts, shells → `all`. Unsure between `edit` and `all` on a
-  trusted task? Pick `all`: too low costs a `DENIED` launch, too high costs
-  nothing. Ladder sharp
-  edges: `edit` allows NO commands, not even read-only ones; on some
-  harnesses `read` maps to a plan mode that can deny even file reads
-  headlessly. For a **guaranteed** read-only review, remove the
+  shape: answer/analysis only → `--no-tools`; must RUN anything (tests,
+  builds, shells) → `all`; file-only work → `edit` IF the no-commands
+  guarantee is itself a requirement, else `all` — agents habitually run
+  harmless probe/verify commands even on pure file tasks, and `edit` turns
+  any of those into a `DENIED` launch. So: `all` for reliability, `edit`
+  for enforced containment, knowingly trading a possible wasted launch.
+  Ladder sharp edges: `edit` allows NO commands, not even read-only ones;
+  on some harnesses `read` maps to a plan mode that can deny even file
+  reads headlessly. For a **guaranteed** read-only review, remove the
   capability instead of trusting a policy: inline the content in the prompt
   AND pass `--no-tools --no-context-files` — the agent then cannot touch any
   file, and the digest prints `tools: none (disabled with --no-tools)` as
@@ -80,6 +83,10 @@ profile aside recoverably.
   level denies, the digest carries `permission:` lines with the exact
   widening command — treat them as the agent asking you; decide, then rerun
   or widen.
+- `--no-tools` (+ `--no-context-files`) — the agent can only answer: no
+  reads, writes, or commands, proven by the digest's `tools: none` line.
+  The standard lever for answer-only delegations and capability-guaranteed
+  read-only reviews (inline the content in the prompt).
 - `--dir <path>` — the working directory the delegated agent runs in;
   relative paths in the task resolve there, and files it creates land there.
   Defaults to the invocation cwd; persists into the preset like every other
@@ -125,7 +132,7 @@ check-in cadence; timeout = "longer than this can only mean failure."
 | Command | Purpose |
 |---|---|
 | `pirun agent <preset> <name> --time <ra>/<to> <task>` | persistent agent turn |
-| `pirun fork <preset> <parent> <child> --time <ra>/<to> <task>` | branch a primed agent (harnesses without native forking reject this) |
+| `pirun fork <preset> <parent> <child> --time <ra>/<to> <task>` | branch a primed agent (`pirun providers` marks sources that cannot fork; replay the priming task into a new agent there) |
 | `pirun agents <preset> [name]` | context, token use, busy state |
 | `pirun retire <preset> <name>` / `--all` | remove an idle agent |
 | `pirun run <preset> --time <ra>/<to> <task>` | one-shot task |
@@ -176,7 +183,11 @@ Do not spend a run on a smoke test first; run the actual task.
   file-tool race means one unchanged rerun is the correct move.
 - `TIMEOUT` — it ran past your something-is-wrong threshold. Inspect the log
   before retrying; do not just retry with a bigger number.
+- `KILLED` — you (or another caller) stopped it with `pirun kill`; expected,
+  nothing to diagnose.
 - `FAILED` — read the `error:` lines; they carry the provider's own message.
+  A failure after completed tool calls is not "nothing happened" — the
+  digest notes when side effects may already exist.
 - `permission:` lines — the agent asked for something its `--permissions`
   level denies. Not a malfunction: decide whether to widen the preset (the
   exact command is printed) or rephrase the task within the level.
@@ -186,8 +197,9 @@ Do not spend a run on a smoke test first; run the actual task.
   trailing newline — verify your capture against it). Never ship a capped
   answer as the deliverable. Capture pattern:
   `pirun poll <preset> <id> --answer > out.md` — but PowerShell `>` writes
-  a BOM; for byte-exact files redirect via `cmd /c` or use
-  `Set-Content -Encoding utf8NoBOM`.
+  a BOM; for byte-exact files redirect from `cmd /c` (or bash). PowerShell
+  5.1 has no BOM-free redirect (`-Encoding utf8NoBOM` needs pwsh 7+); if
+  you must stay in it, use `[IO.File]::WriteAllText`.
 - `tools:` trace — a `!` prefix marks a failed tool call. A run that still
   says `OK` recovered (often via a fallback visible right after); judge by
   the status and the answer, not by `!` entries.

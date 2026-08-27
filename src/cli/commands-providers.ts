@@ -3,8 +3,10 @@
 import { existsSync, renameSync } from 'node:fs';
 import { flagString, type PirunArgs as Args } from '../pirun-args.ts';
 import {
+	HARNESS_CAN_FORK,
 	loadPirunConfig,
-	migratePresetsToProviders
+	migratePresetsToProviders,
+	type PirunHarness
 } from '../pirun-config.ts';
 import {
 	accountEnvVar,
@@ -64,7 +66,9 @@ function providerRows() {
 			detected: detectedEnvAccounts(store, name),
 			defaultAccount: entry?.defaultAccount ?? (accounts.length === 1 ? accounts[0].account : ''),
 			models: endpointModels(store, name).map((model) => model.id),
-			spend: Boolean(CANONICAL_ENDPOINTS[name]?.spend)
+			spend: Boolean(CANONICAL_ENDPOINTS[name]?.spend),
+			// Endpoint presets run on the Pi harness, which forks sessions.
+			fork: HARNESS_CAN_FORK.pi
 		});
 	}
 	for (const name of HARNESS_PROVIDERS) {
@@ -80,7 +84,8 @@ function providerRows() {
 			canonical: true,
 			accounts,
 			defaultAccount: entry?.defaultAccount ?? (accounts.length === 1 ? accounts[0].account : ''),
-			login: `pirun login ${name} <account>`
+			login: `pirun login ${name} <account>`,
+			fork: HARNESS_CAN_FORK[name as PirunHarness] ?? false
 		});
 	}
 	return rows;
@@ -103,7 +108,9 @@ export function commandProviders(args: Args) {
 	for (const row of rows) {
 		const accounts = row.accounts as Array<{ account: string; key: string; ready: boolean }>;
 		const detected = (row.detected as Array<{ account: string; envVar: string }> | undefined) ?? [];
-		const headline = `${String(row.name).padEnd(12)} ${row.kind}${row.canonical ? '' : ' (custom)'}  ${row.baseUrl ?? ''}`;
+		const headline =
+			`${String(row.name).padEnd(12)} ${row.kind}${row.canonical ? '' : ' (custom)'}` +
+			`${row.fork === false ? ' (no forking)' : ''}  ${row.baseUrl ?? ''}`;
 		out(headline.trimEnd());
 		for (const account of accounts) {
 			const mark = account.account === row.defaultAccount && accounts.length > 1 ? '*' : ' ';

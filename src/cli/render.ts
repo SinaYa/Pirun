@@ -27,10 +27,12 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 	if (digest.cost > 0) parts.push(`$${digest.cost.toFixed(4)}`);
 
 	// Echoing effort next to the model closes the "did my --effort align with
-	// the id's tier?" loop from the output instead of a doc round-trip.
+	// the id's tier?" loop from the output instead of a doc round-trip; when
+	// the id itself encodes the tier, say the alignment outright.
+	const aligned = meta.effort && meta.model.endsWith(`-${meta.effort}`) ? ' (=id tier)' : '';
 	out(
 		`[${options.label ?? meta.id}] ${digest.status.toUpperCase()}  ${parts.join('  ')}  ${meta.model}` +
-			`${meta.effort ? `  effort=${meta.effort}` : ''}`
+			`${meta.effort ? `  effort=${meta.effort}${aligned}` : ''}`
 	);
 
 	if (digest.tools.length) {
@@ -54,6 +56,12 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 	}
 	if (asks.length) {
 		out(`permission: allow more for this preset: pirun config ${meta.preset ?? state.presetName} --permissions all`);
+	}
+
+	// FAILED must not read as "nothing happened": completed tool calls mean
+	// side effects (files, commands) may already exist.
+	if (digest.status === 'failed' && digest.tools.some((tool) => !tool.failed)) {
+		out('note: tools completed before the failure — side effects may exist; inspect before retrying.');
 	}
 
 	if (digest.status === 'interrupted') {

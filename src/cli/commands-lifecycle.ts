@@ -3,6 +3,7 @@
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { flagString, type PirunArgs as Args } from '../pirun-args.ts';
+import { HARNESS_CAN_FORK } from '../pirun-config.ts';
 import { atomicWriteJson, updateOwnedLock } from '../pirun-files.ts';
 import { terminateProcessTree } from '../pirun-process.ts';
 import { humanClock, parseTimeAdjust, parseWaitTime } from '../pirun-time.ts';
@@ -143,8 +144,8 @@ export async function commandAgent(args: Args) {
 }
 
 export async function commandFork(args: Args) {
-	if (state.preset.harness === 'antigravity') {
-		die('Antigravity does not expose conversation forking; start a new named agent instead.');
+	if (!HARNESS_CAN_FORK[state.preset.harness]) {
+		die(`${state.preset.harness === 'antigravity' ? 'Antigravity' : state.preset.harness} does not expose conversation forking; start a new named agent instead.`);
 	}
 	const [parentName, childName] = args.positional;
 	if (!parentName || !childName) die('usage: pirun fork <preset> <parent> <child> <task…>');
@@ -302,6 +303,10 @@ export function commandStopJob(args: Args) {
 		out(`[${id}] already finished`);
 		return;
 	}
+
+	// A deliberate stop must read as KILLED afterwards, never FAILED.
+	meta.killedAt = Date.now();
+	writeMeta(meta);
 
 	// Once Pi has started, stop it and leave the live supervisor to record the
 	// real exit and release any named-agent lock. Before that hand-off, the only

@@ -257,6 +257,9 @@ export async function runToCompletion(meta: JobMeta) {
 				readFileSync(resolve(jobDir(meta.id), 'meta.json'), 'utf8')
 			) as JobMeta;
 			if (onDisk.deadlineAt) meta.deadlineAt = onDisk.deadlineAt;
+			// A kill marker written by `pirun kill` must survive this
+			// supervisor's own final meta write.
+			if (onDisk.killedAt) meta.killedAt = onDisk.killedAt;
 		} catch {
 			/* a transient read race keeps the last known deadline */
 		}
@@ -272,6 +275,16 @@ export async function runToCompletion(meta: JobMeta) {
 	});
 	clearInterval(enforcer);
 	await captureDone;
+
+	// `pirun kill` writes its marker to disk before terminating the child;
+	// the exit usually lands before the enforcer's next tick, so merge once
+	// here or the final writeMeta below would erase the marker.
+	try {
+		const onDisk = JSON.parse(readFileSync(resolve(jobDir(meta.id), 'meta.json'), 'utf8')) as JobMeta;
+		if (onDisk.killedAt) meta.killedAt = onDisk.killedAt;
+	} catch {
+		/* keep the in-memory state */
+	}
 
 	meta.finishedAt = Date.now();
 	meta.exitCode = exitCode;
