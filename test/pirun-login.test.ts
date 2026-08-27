@@ -9,7 +9,7 @@ import { after, test } from 'node:test';
 // a temp profile directory. No OAuth, no browser, no real harness.
 process.env.PIRUN_PROVIDERS_PATH = resolve(tmpdir(), 'pirun-login-test-providers.json');
 process.env.PIRUN_RUNS_DIR = resolve(tmpdir(), 'pirun-login-test-runs');
-const { runAntigravityLoginDialog } = await import('../src/cli/auth.ts');
+const { isExpiredSignInAttempt, runAntigravityLoginDialog } = await import('../src/cli/auth.ts');
 
 const sandbox = mkdtempSync(resolve(tmpdir(), 'pirun-login-'));
 after(() => rmSync(sandbox, { recursive: true, force: true }));
@@ -98,6 +98,38 @@ test('a pasted code reaches agy and success is read from the profile', async () 
 	assert.ok(!printed.some((line) => line.includes('/quit')));
 });
 
+test('an inherited-console child (stdin null) runs without a relay and succeeds', async () => {
+	// agy's code prompt only reads a real console, so the login hands the
+	// console to agy (stdin inherited -> child.stdin null). The dialog must not
+	// read the console itself and still detects success from the profile.
+	const profileDir = profileFor('inherit');
+	writeProfileLog(profileDir, 'Using file-based token storage\n');
+	const child = fakeChild();
+	(child as { stdin: PassThrough | null }).stdin = null;
+	const openedUrls: string[] = [];
+
+	const dialog = runAntigravityLoginDialog({
+		account: 'inherit',
+		profileDir,
+		child: child as never,
+		input: new PassThrough(),
+		openUrl: (url) => openedUrls.push(url),
+		print: () => {},
+		pollMs: 25
+	});
+
+	child.stdout.write(`${OAUTH_URL}\n`);
+	await new Promise((r) => setTimeout(r, 50));
+	writeProfileLog(
+		profileDir,
+		'Using file-based token storage\nOAuth: authenticated successfully as someone\n'
+	);
+
+	const result = await dialog;
+	assert.deepEqual(result, { ok: true });
+	assert.deepEqual(openedUrls, [OAUTH_URL]);
+});
+
 test('an early agy exit fails with its last output lines as context', async () => {
 	const profileDir = profileFor('exit');
 	writeProfileLog(profileDir, 'Using file-based token storage\n');
@@ -142,6 +174,33 @@ test('a keyring fallback during login is refused', async () => {
 
 	assert.equal(result.ok, false);
 	if (!result.ok) assert.match(result.reason, /keyring/);
+});
+
+test('an expired 60-second sign-in link is recognized as retryable', () => {
+	// The failure shape observed live: agy exits 1 after its hard-coded
+	// 60-second link window lapses, with the timeout on its last output lines.
+	assert.equal(
+		isExpiredSignInAttempt({
+			ok: false,
+			reason: 'Antigravity exited (1) before authentication completed',
+			context: [
+				'Waiting for authentication (timeout 60s)...',
+				'Or, paste the authorization code here and press Enter:',
+				'Error: authentication timed out.',
+				'Error: authentication failed or timed out'
+			]
+		}),
+		true
+	);
+	assert.equal(
+		isExpiredSignInAttempt({
+			ok: false,
+			reason: 'Antigravity exited (1) before authentication completed',
+			context: ['fatal: network unreachable']
+		}),
+		false
+	);
+	assert.equal(isExpiredSignInAttempt({ ok: true }), false);
 });
 
 test('the dialog times out instead of waiting forever', async () => {

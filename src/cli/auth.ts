@@ -102,12 +102,16 @@ function stripAnsi(text: string) {
 }
 
 /**
- * Pirun's own login interface. Antigravity's interactive UI is never shown:
- * agy runs fully piped in the background while the human sees only these
- * prompts. The OAuth URL is scraped from agy's output for the browser, pasted
- * lines are relayed to agy's stdin, and success is detected by inspecting the
- * profile on disk — so no `/quit`, no harness TUI. On failure, agy's last
- * output lines are surfaced as context.
+ * Pirun's own login interface. agy's output stays piped and hidden while the
+ * OAuth URL is scraped from it for the browser, and success is detected by
+ * inspecting the profile on disk — so no `/quit`, no harness TUI. agy's stdin,
+ * however, must be the real console when one exists (child.stdin null here):
+ * agy's authorization-code reader only reads from a console handle — a code
+ * written to a stdin pipe is never seen (verified agy 1.1.19: a code line fed
+ * to piped stdin draws no reaction at all, neither on write nor at EOF, and
+ * agy times out as if nothing was entered). The line relay below is kept only
+ * for callers that pass a piped stdin. On failure, agy's last output lines are
+ * surfaced as context.
  */
 export async function runAntigravityLoginDialog(options: {
 	account: string;
@@ -142,25 +146,31 @@ export async function runAntigravityLoginDialog(options: {
 				print('Browser opened — sign in with Google.');
 				print(`If it did not open, use this link: ${url}`);
 				print('If the page shows an authorization code, paste it here and press Enter.');
+				print('Antigravity gives each link only ~60 seconds; an expired link gets a fresh one automatically.');
 			}
 		});
 	};
 	watch(child.stdout);
 	watch(child.stderr);
 
-	const reader = createInterface({ input, terminal: false });
-	reader.on('line', (line) => child.stdin?.write(`${line}\n`));
+	// With inherited stdin (child.stdin null) the console feeds agy directly;
+	// reading it here too would steal keystrokes from agy's code prompt.
+	const reader = child.stdin ? createInterface({ input, terminal: false }) : null;
+	reader?.on('line', (line) => child.stdin?.write(`${line}\n`));
 
 	let exited = false;
+	let spawnFailed = false;
 	child.once('exit', () => {
 		exited = true;
 	});
 	child.once('error', () => {
 		exited = true;
+		spawnFailed = true;
 	});
 
 	const lastOutput = () =>
 		stripAnsi(buffer).split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(-5);
+	let warnedSilent = false;
 
 	try {
 		while (Date.now() < deadline) {
@@ -169,23 +179,38 @@ export async function runAntigravityLoginDialog(options: {
 				return { ok: false, reason: 'the login left the isolated file-backed profile (keyring detected)', context: lastOutput() };
 			}
 			if (inspected.authenticated && inspected.usesFileStorage) return { ok: true };
-			if (exited && child.exitCode !== null) {
+			if (exited) {
 				// One last look: the success record can land just before exit.
 				const final = inspectAntigravityProfile(options.profileDir, startedAt);
 				if (final.authenticated && final.usesFileStorage && !final.usesKeyring) return { ok: true };
 				return {
 					ok: false,
-					reason: `Antigravity exited (${child.exitCode}) before authentication completed`,
+					reason: spawnFailed
+						? 'Antigravity could not be started (spawn error)'
+						: `Antigravity exited (${child.exitCode}) before authentication completed`,
 					context: lastOutput()
 				};
+			}
+			if (!opened && !warnedSilent && buffer.length === 0 && Date.now() - startedAt > 30_000) {
+				warnedSilent = true;
+				print('Antigravity has produced no output for 30 seconds.');
+				print(`If this persists, check the logs under ${options.profileDir} and re-run the login.`);
 			}
 			await new Promise((resolvePoll) => setTimeout(resolvePoll, options.pollMs ?? 500));
 		}
 		return { ok: false, reason: 'the sign-in did not complete within 15 minutes', context: lastOutput() };
 	} finally {
-		reader.close();
+		reader?.close();
 		if (child.exitCode === null && child.pid) terminateProcessTree(child.pid);
 	}
+}
+
+/** True when agy gave up because its 60-second sign-in link lapsed, which a
+ * fresh attempt (new link, browser session still signed in) usually fixes. */
+export function isExpiredSignInAttempt(result: { ok: boolean; reason?: string; context?: string[] }) {
+	if (result.ok) return false;
+	const text = [result.reason ?? '', ...(result.context ?? [])].join('\n').toLowerCase();
+	return text.includes('authentication timed out') || text.includes('authentication failed or timed out');
 }
 
 export async function loginAntigravityAccount(account: string, force = false) {
@@ -202,14 +227,44 @@ export async function loginAntigravityAccount(account: string, force = false) {
 		out(`Checking isolated credential storage for account "${account}"…`);
 		isolationMode = await verifyAntigravityIsolation(entry, profileDir, cwd);
 	}
-	const child = spawn(entry, antigravityBaseArgs(profileDir), {
-		cwd,
-		stdio: ['pipe', 'pipe', 'pipe'],
-		windowsHide: true,
-		env: antigravityEnv(isolationMode)
-	});
-	const result = await runAntigravityLoginDialog({ account, profileDir, child });
-	if (!result.ok) {
+	// Login must run agy in print mode: the interactive TUI emits nothing on
+	// piped stdio — with stdin held open it blocks reading stdin before printing
+	// a single byte (verified agy 1.1.19 on Windows: 0 bytes on stdout+stderr,
+	// language server never starts). Print mode is what emits "Authentication
+	// required. Please visit the URL to log in:" on stderr, accepts a pasted
+	// authorization code on stdin, and records "Print mode: silent auth
+	// succeeded" — the success pattern this login already detects.
+	// agy hard-codes a 60-second window per sign-in link and there is no flag or
+	// env var to widen it (binary literal "Waiting for authentication (timeout
+	// 60s)", agy 1.1.19). A first sign-in — password, consent, copying the code —
+	// rarely fits, and every fresh agy run mints a new PKCE link that invalidates
+	// the previous code. So expired links retry automatically: the browser
+	// session survives between attempts, making the next link a few clicks.
+	const deadline = Date.now() + 15 * 60_000;
+	for (;;) {
+		// agy's authorization-code prompt reads only from a real console handle,
+		// so when this process has one (the Windows login window, a terminal) agy
+		// inherits it and the pasted code goes to agy directly. A pipe is kept
+		// only when there is no console to hand over.
+		const child = spawn(entry, [...antigravityBaseArgs(profileDir), '-p', 'Reply with exactly OK.'], {
+			cwd,
+			stdio: [process.stdin.isTTY ? 'inherit' : 'pipe', 'pipe', 'pipe'],
+			windowsHide: true,
+			env: antigravityEnv(isolationMode)
+		});
+		const result = await runAntigravityLoginDialog({
+			account,
+			profileDir,
+			child,
+			timeoutMs: Math.max(deadline - Date.now(), 1)
+		});
+		if (result.ok) break;
+		if (isExpiredSignInAttempt(result) && Date.now() < deadline) {
+			out('');
+			out('That sign-in link expired (Antigravity allows only ~60 seconds per link).');
+			out('Requesting a fresh link — you are likely still signed in, so approving it is quick.');
+			continue;
+		}
 		for (const line of result.context) out(`agy: ${line}`);
 		throw new Error(
 			`${result.reason}. Run "pirun login antigravity ${account}" to try again.`
