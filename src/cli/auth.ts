@@ -142,6 +142,7 @@ export async function runAntigravityLoginDialog(options: {
 				print('Browser opened — sign in with Google.');
 				print(`If it did not open, use this link: ${url}`);
 				print('If the page shows an authorization code, paste it here and press Enter.');
+				print('Antigravity gives each link only ~60 seconds; an expired link gets a fresh one automatically.');
 			}
 		});
 	};
@@ -198,6 +199,14 @@ export async function runAntigravityLoginDialog(options: {
 	}
 }
 
+/** True when agy gave up because its 60-second sign-in link lapsed, which a
+ * fresh attempt (new link, browser session still signed in) usually fixes. */
+export function isExpiredSignInAttempt(result: { ok: boolean; reason?: string; context?: string[] }) {
+	if (result.ok) return false;
+	const text = [result.reason ?? '', ...(result.context ?? [])].join('\n').toLowerCase();
+	return text.includes('authentication timed out') || text.includes('authentication failed or timed out');
+}
+
 export async function loginAntigravityAccount(account: string, force = false) {
 	const profileDir = antigravityAccountProfileDir(account);
 	const alreadyAuthenticated = hasAntigravityAuthMarker(profileDir);
@@ -219,14 +228,33 @@ export async function loginAntigravityAccount(account: string, force = false) {
 	// required. Please visit the URL to log in:" on stderr, accepts a pasted
 	// authorization code on stdin, and records "Print mode: silent auth
 	// succeeded" — the success pattern this login already detects.
-	const child = spawn(entry, [...antigravityBaseArgs(profileDir), '-p', 'Reply with exactly OK.'], {
-		cwd,
-		stdio: ['pipe', 'pipe', 'pipe'],
-		windowsHide: true,
-		env: antigravityEnv(isolationMode)
-	});
-	const result = await runAntigravityLoginDialog({ account, profileDir, child });
-	if (!result.ok) {
+	// agy hard-codes a 60-second window per sign-in link and there is no flag or
+	// env var to widen it (binary literal "Waiting for authentication (timeout
+	// 60s)", agy 1.1.19). A first sign-in — password, consent, copying the code —
+	// rarely fits, and every fresh agy run mints a new PKCE link that invalidates
+	// the previous code. So expired links retry automatically: the browser
+	// session survives between attempts, making the next link a few clicks.
+	const deadline = Date.now() + 15 * 60_000;
+	for (;;) {
+		const child = spawn(entry, [...antigravityBaseArgs(profileDir), '-p', 'Reply with exactly OK.'], {
+			cwd,
+			stdio: ['pipe', 'pipe', 'pipe'],
+			windowsHide: true,
+			env: antigravityEnv(isolationMode)
+		});
+		const result = await runAntigravityLoginDialog({
+			account,
+			profileDir,
+			child,
+			timeoutMs: Math.max(deadline - Date.now(), 1)
+		});
+		if (result.ok) break;
+		if (isExpiredSignInAttempt(result) && Date.now() < deadline) {
+			out('');
+			out('That sign-in link expired (Antigravity allows only ~60 seconds per link).');
+			out('Requesting a fresh link — you are likely still signed in, so approving it is quick.');
+			continue;
+		}
 		for (const line of result.context) out(`agy: ${line}`);
 		throw new Error(
 			`${result.reason}. Run "pirun login antigravity ${account}" to try again.`
