@@ -141,10 +141,9 @@ frozen legacy and still contains the proxy's home docs.
   denial IS the ask: digests carry `permission:` lines with the exact
   widening command, traveling up like response text. Presets predating the
   feature are stamped `all` (their old semantics); new presets get `edit`.
-  ⚠ CONFIRMED BUG (UXA round 2): pirun sets agy's process cwd but never its
-  workspace — agents can write into the profile scratch dir ("no active
-  workspace set"). Fix = `--add-dir <cwd>` in spawnAntigravity; pending fix
-  #1 in UXA-FINDINGS.md.
+  FIXED 2026-08-27: pirun passes `--add-dir <meta.cwd>` so agy always has a
+  workspace (was: agents wrote into the profile scratch dir); verified live
+  with a relative-path file task.
 - **UXA round-1 fixes (2026-08-27, from 4 live Opus-5 test users):** state
   moved to the machine-global home (see below); antigravity effort-suffix
   model ids auto-align with --effort (--effort wins, rewrites the suffix —
@@ -172,17 +171,19 @@ frozen legacy and still contains the proxy's home docs.
 
 ## Current state
 
-- 68 tests pass (`npm test`, which also runs the line-cap guard); `npm run
+- 70 tests pass (`npm test`, which also runs the line-cap guard); `npm run
   check` syntax-checks every source file and runs the guard. Suites: CLI
   surface characterization, lifecycle (fake-pi, fully sandboxed), providers,
   antigravity parsing, login dialog (fake child), keep-alive due-ness,
   permissions (+DENIED digest), args, time, files, pi-settings, timeouts.
 - **Two UXA test rounds completed** (4 Opus-5 test users each, 8/8 tasks
-  succeeded); exact results, shipped fixes, and the APPROVED pending fix
-  list (agy workspace wiring, truncation notice, models multi-account, docs)
-  live in `UXA-FINDINGS.md` — that is the next work item, then round 3.
-  Round-2 test state (`r2*` presets/runs, `D:\projectx\pirun-uxa-test\`) not
-  yet purged.
+  succeeded) and **all approved round-2 fixes shipped 2026-08-27** (agy
+  workspace wiring, truncation notice, models multi-account + `/account`
+  form, read-only recipe with `tools: none` proof, `--dir` docs, status/
+  retire smalls) — details in `UXA-FINDINGS.md`. Next work item: purge
+  `r2*` state (protocol in UXA-FINDINGS), then UXA round 3 on the task
+  variants listed there. Round-2 test state (`r2*` presets/runs,
+  `D:\projectx\pirun-uxa-test\`) not yet purged.
 - **Anti-bloat guard**: no source file may exceed 400 lines
   (`scripts/max-lines.mjs`). Enforced in `npm test`, `npm run check`, and a
   pre-commit hook (`.githooks/pre-commit`; `core.hooksPath` is set by npm's
@@ -242,9 +243,9 @@ sync) · `pirun-antigravity.ts` · `pirun-provider-net.ts` (spend, /models) ·
 2. ~~**Separate the proxy concern from the Pirun front door**~~ — done
    2026-08-27: the proxy code was deleted from this repo entirely (it lives
    on in CladGPT), not wrapped. See Current state.
-3. **Now:** the approved UXA round-2 fix list in `UXA-FINDINGS.md`, then UXA
-   round 3 (same methodology, fresh Opus test users, purge `r2*` state
-   first).
+3. ~~The approved UXA round-2 fix list~~ — shipped 2026-08-27 (see
+   `UXA-FINDINGS.md`). **Now:** UXA round 3 (same methodology, fresh Opus
+   test users, purge `r2*` state first; task variants in UXA-FINDINGS).
 4. Then refactor/code-improvement generally, and eventually more harness CLIs
    behind an adapter boundary (auth, sessions, forking, tools, providers as
    explicit capabilities; keep-alive and permission registries already

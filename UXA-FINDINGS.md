@@ -2,7 +2,7 @@
 
 2026-08-27. Read with `HANDOFF.md` (constitution; read that first). This file:
 exact results of the Opus-5 test-user passes, what shipped from them, what is
-still owed. Continuation in a fresh session starts at "Pending fixes".
+still owed. Continuation in a fresh session starts at "Next: round 3".
 
 ## Methodology (reusable; the user wants more rounds)
 
@@ -80,35 +80,45 @@ changing the announce/exit-1 pairing.
   content + `--permissions read` + `--no-tools --no-context-files` + foreign
   cwd. Found bug #2 below.
 
-## Pending fixes (ranked; next work item, approved direction "do these")
+## Round-2 fixes — SHIPPED 2026-08-27 (all approved items done)
 
-1. **agy workspace wiring (confirmed bug).** With `--dir` set and cwd
-   provably correct (init event), the agent wrote to its PROFILE SCRATCH dir:
-   "You do not currently have an active workspace set". pirun never passes
-   agy `--add-dir`. Fix: `spawnAntigravity` adds `--add-dir <meta.cwd>`.
-   Explains all 8 threads' defensive absolute-path habit. Verify live.
-2. **Silent answer truncation (found by D; most dangerous).** 7.9k-char
-   answer clipped at 2000 with only a bare `…`, exit 0 — mangled deliverable
-   with no notice. Fix: explicit `note: answer truncated (N chars) — full:
-   pirun poll <preset> <id> --full`; document `--full` in FOR-AGENTS.
-3. **`models <provider>` multi-account (4/4 round-2 threads).** Errors when
-   2 accounts and no default; both suggested remedies wrong (global-state
-   mutation for a read-only lookup / nonexistent preset). Fix: accept
-   `models <provider>/<account>` AND fall back to any authenticated account
-   for plain catalog reads (same list); fix runbook claim.
-4. **Read-only recipe** into FOR-AGENTS: `--no-tools --no-context-files` +
-   inlined content is the capability guarantee (inlining alone is content-
-   level). Consider digest printing `tools: none` as proof.
-5. **`--dir` into FOR-AGENTS** flag docs (2/4 both rounds).
-6. Small: `status` ineligible-line reframe (it reads as a run-blocker next
-   to `login ready`) · `retire <preset> --all` with zero agents should no-op,
-   not die usage · consider digest warning when files were written outside
-   `--dir` (C's misplaced-file case).
+1. **agy workspace wiring** — `antigravityRunArgs` takes `workspaceDir`;
+   `spawnAntigravity` passes `meta.cwd` as `--add-dir`. Verified live: the
+   acid test (relative-path file creation, no absolute paths in the prompt)
+   landed `workspace-proof.txt` in `--dir`, agent reported the absolute path.
+2. **Truncation notice** — a clipped digest answer now ends with
+   `note: answer truncated (N chars) — full: pirun poll <preset> <id> --full`;
+   `--full` documented in FOR-AGENTS "Reading failures". Unit-tested
+   (`test/pirun-render.test.ts`: note present when clipped, absent with
+   `--full` and for short answers).
+3. **`models <provider>` multi-account** — accepts
+   `models <provider>/<account>`; with no default account, plain catalog
+   reads fall back to any logged-in account (catalog is account-independent);
+   unknown account errors name the known ones. Verified live on all three
+   forms. Runbook claim fixed (`<provider>[/<account>]`).
+4. **Read-only recipe** in FOR-AGENTS: `--no-tools --no-context-files` +
+   inlined content is the capability guarantee; inlining alone only avoids
+   reads. Digest prints `tools: none (disabled with --no-tools)` as proof
+   (verified live + unit test).
+5. **`--dir`** documented in FOR-AGENTS flag bullets (persists per preset,
+   relative paths resolve there).
+6. Small: `status` ineligible line reframed as a historical, location-
+   dependent note · `retire <preset> --all` with zero agents prints
+   "no agents to retire." and exits 0 (verified live).
+
+NOT done (was a "consider", needs design judgment): digest warning when
+files were written outside `--dir` (C's misplaced-file case) — the workspace
+fix (#1) removes the known cause; revisit only if round 3 shows strays.
 
 Parked design ideas (user judgment, not bugs): permission tier "commands
 scoped to --dir" (A) · multi-run `wait` (B) · tool-enforced file ownership
 (B) · `--out <file>` clean answer capture (D).
 
-After fixes: purge `r2*` state, run round 3 with 4 fresh Opus test users on
-new task variants targeting fixes 1–3 (a --dir-relative file task with NO
-absolute paths in the prompt is the acid test for #1).
+## Next: round 3
+
+Purge `r2*` state first (protocol above), then 4 fresh Opus test users on
+new task variants targeting the shipped fixes: a --dir-relative file task
+with NO absolute paths in the prompt (acid test for #1, now expected to
+pass); a long-deliverable task that must survive >2000 chars (#2); a
+fresh-perspective model-discovery task with two accounts and no default
+(#3); a guaranteed read-only review using the documented recipe (#4).

@@ -51,7 +51,11 @@ export async function commandStatus() {
 		out(`agy     ${entry || 'not found'}`);
 		out(`profile ${profile}`);
 		out(`login   ${hasAntigravityAuthMarker(profile) ? 'ready (isolated file storage)' : 'required'}`);
-		if (inspectAntigravityProfile(profile).ineligible) out('account ineligible in the current location');
+		if (inspectAntigravityProfile(profile).ineligible) {
+			// Historical marker from the profile logs, not a live run-blocker:
+			// eligibility depends on the network location at the time of a call.
+			out('note    a past agy session logged "account ineligible" (location-dependent); if runs succeed, ignore');
+		}
 	} else {
 		const entry = PI_CANDIDATES.find((candidate) => existsSync(candidate));
 		out(`pi      ${entry ? entry : 'not found on the usual paths'}`);
@@ -121,8 +125,9 @@ export function commandConfig() {
 
 /**
  * `pirun models <name>`: a name that is not an existing preset but is a known
- * provider browses that provider's catalog directly — no preset needed, which
- * is exactly the fresh-machine situation. Preset names win on collision.
+ * provider (optionally `provider/account`) browses that provider's catalog
+ * directly — no preset needed, which is exactly the fresh-machine situation.
+ * Preset names win on collision.
  */
 export function providerForModels(nameRaw: string | undefined): string {
 	const name = (nameRaw ?? '').trim();
@@ -132,18 +137,29 @@ export function providerForModels(nameRaw: string | undefined): string {
 	} catch {
 		return '';
 	}
-	const lowered = name.toLowerCase();
+	const lowered = name.toLowerCase().split('/')[0];
 	return knownProviderNames(state.providersStore).includes(lowered) ? lowered : '';
 }
 
 export async function commandProviderModels(provider: string, args: Args) {
 	if ((HARNESS_PROVIDERS as readonly string[]).includes(provider)) {
+		const requested = ((args.positional[0] ?? '').split('/')[1] ?? '').trim();
 		const entry = state.providersStore.harnesses[provider];
 		const accounts = Object.keys(entry?.accounts ?? {});
-		const account = entry?.defaultAccount ?? (accounts.length === 1 ? accounts[0] : '');
+		if (requested && !accounts.includes(requested)) {
+			die(`${provider} has no account "${requested}". Known: ${accounts.join(', ') || '(none)'}.`);
+		}
+		let account = requested || entry?.defaultAccount || (accounts.length === 1 ? accounts[0] : '');
+		if (!account) {
+			// The catalog is the same for every account, so a plain read may use
+			// any logged-in one — no default, no preset, no store mutation.
+			account = [...accounts].sort().find((name) =>
+				hasAntigravityAuthMarker(antigravityAccountProfileDir(name))
+			) ?? '';
+		}
 		if (!account) {
 			die(accounts.length
-				? `${provider} has ${accounts.length} accounts; set one as default (pirun provider default ${provider} <account>) or use a preset.`
+				? `none of ${provider}'s accounts (${accounts.join(', ')}) is logged in.\nrun: pirun login ${provider} <account>`
 				: `${provider} has no accounts yet.\nrun: pirun login ${provider} <account>`);
 		}
 		try {

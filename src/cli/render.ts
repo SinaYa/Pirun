@@ -33,6 +33,9 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 			.map((tool) => `${tool.failed ? '!' : ''}${tool.name}${tool.hint ? `(${tool.hint})` : ''}`)
 			.join(' · ');
 		out(`tools: ${truncate(rendered, options.full ? 4000 : 300)}`);
+	} else if (!meta.tools) {
+		// Proof line for guaranteed read-only runs: the harness had no tools.
+		out('tools: none (disabled with --no-tools)');
 	}
 
 	for (const note of digest.notes.slice(0, 2)) out(`note: ${note}`);
@@ -62,7 +65,16 @@ export function renderDigest(meta: JobMeta, digest: Digest, options: { full: boo
 	if (digest.text) {
 		out('---');
 		// The answer is the payload: cap its length but keep its line structure.
-		out(options.full || digest.text.length <= 2000 ? digest.text : `${digest.text.slice(0, 2000)}…`);
+		if (options.full || digest.text.length <= 2000) out(digest.text);
+		else {
+			out(`${digest.text.slice(0, 2000)}…`);
+			// A clipped deliverable must never look complete: name the exact
+			// command that prints all of it.
+			out(
+				`note: answer truncated (${digest.text.length} chars) — ` +
+					`full: pirun poll ${meta.preset ?? state.presetName} ${meta.id} --full`
+			);
+		}
 	}
 }
 

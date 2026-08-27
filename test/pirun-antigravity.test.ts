@@ -48,6 +48,7 @@ test('run args follow normal agy CLI usage', () => {
 			profileDir: dir,
 			conversationId: 'conv-1',
 			model: 'auto',
+			workspaceDir: 'D:\\work\\project',
 			permissionArgs: ['--mode', 'accept-edits'],
 			timeoutSec: 90
 		});
@@ -57,6 +58,7 @@ test('run args follow normal agy CLI usage', () => {
 			'--output-format', 'stream-json',
 			'--print-timeout', '90s',
 			'--conversation', 'conv-1',
+			'--add-dir', 'D:\\work\\project',
 			'--mode', 'accept-edits'
 		]);
 		// No permission args = agy's own default policy, nothing injected.

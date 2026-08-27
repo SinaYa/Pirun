@@ -83,7 +83,14 @@ export function commandAgents(args: Args) {
 
 export function commandRetire(args: Args) {
 	const names = args.flags.has('all') ? presetAgents().map((agent) => agent.name) : args.positional;
-	if (!names.length) die('usage: pirun retire <preset> <name> | --all');
+	if (!names.length) {
+		// "Retire everything" with nothing to retire is a satisfied request.
+		if (args.flags.has('all')) {
+			out('no agents to retire.');
+			return;
+		}
+		die('usage: pirun retire <preset> <name> | --all');
+	}
 	for (const name of names) {
 		const agent = readAgent(name);
 		if (!agent) {

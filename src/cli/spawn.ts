@@ -202,6 +202,7 @@ async function spawnAntigravity(meta: JobMeta) {
 			model: meta.model,
 			effort: meta.antigravity.effort,
 			agent: meta.antigravity.agent,
+			workspaceDir: meta.cwd,
 			// --no-tools keeps agy's default headless policy (deny everything
 			// risky); otherwise the preset's permission level decides.
 			permissionArgs: meta.tools && meta.permissions

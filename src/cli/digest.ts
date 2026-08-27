@@ -39,7 +39,7 @@ export interface Digest {
 	permissionAsks: string[];
 }
 
-function emptyDigest(): Digest {
+export function emptyDigest(): Digest {
 	return {
 		status: 'running',
 		sessionId: '',

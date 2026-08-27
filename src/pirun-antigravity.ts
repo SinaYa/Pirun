@@ -141,6 +141,12 @@ export function antigravityRunArgs(options: {
 	model?: string;
 	effort?: string;
 	agent?: string;
+	/**
+	 * The run's working directory, registered as agy's workspace. Without
+	 * --add-dir, agy has "no active workspace set" and writes relative paths
+	 * into the profile scratch dir instead of the cwd (confirmed UXA round 2).
+	 */
+	workspaceDir?: string;
 	/** From the permission registry; empty = agy's default deny-when-headless. */
 	permissionArgs?: string[];
 	timeoutSec: number;
@@ -158,6 +164,7 @@ export function antigravityRunArgs(options: {
 	if (options.model && options.model !== 'auto') args.push('--model', options.model);
 	if (options.effort) args.push('--effort', options.effort);
 	if (options.agent) args.push('--agent', options.agent);
+	if (options.workspaceDir) args.push('--add-dir', options.workspaceDir);
 	args.push(...(options.permissionArgs ?? []));
 	return args;
 }

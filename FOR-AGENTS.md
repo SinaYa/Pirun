@@ -30,8 +30,9 @@ start is not a model failure — read the progress digest before judging.
 
 Authentication lives in one machine-global store. `pirun providers --json`
 returns every provider, account, and readiness in one call — everything
-`--use` can say. Model catalogs: `pirun models <provider>` (no preset needed;
-harness catalogs are fetched live from the harness).
+`--use` can say. Model catalogs: `pirun models <provider>[/<account>]` (no
+preset needed; harness catalogs are fetched live through any logged-in
+account when no account is named).
 
 | Source | Select with | Accounts come from |
 |---|---|---|
@@ -62,12 +63,20 @@ profile aside recoverably.
   mapped to each harness's own mechanism (default `edit`). Know the ladder's
   sharp edges: `edit` allows file edits but NO commands, not even read-only
   ones; on some harnesses `read` maps to a plan mode that can deny even file
-  reads headlessly — for a guaranteed read-only review, inline the content in
-  the prompt instead of pointing at files. A level the harness cannot honor
+  reads headlessly. For a **guaranteed** read-only review, remove the
+  capability instead of trusting a policy: inline the content in the prompt
+  AND pass `--no-tools --no-context-files` — the agent then cannot touch any
+  file, and the digest prints `tools: none (disabled with --no-tools)` as
+  proof. Inlining alone only avoids reads; it does not prevent writes. A
+  level the harness cannot honor
   is refused naming the supported ones. When the agent wants something the
   level denies, the digest carries `permission:` lines with the exact
   widening command — treat them as the agent asking you; decide, then rerun
   or widen.
+- `--dir <path>` — the working directory the delegated agent runs in;
+  relative paths in the task resolve there, and files it creates land there.
+  Defaults to the invocation cwd; persists into the preset like every other
+  setting, so set it once per project preset.
 - `--prefix "…"` / `--prefix-file <path|->` / `--no-prefix` — text prepended
   to every prompt of the preset; `-` reads it from stdin
   (`echo rules | pirun config p --prefix-file -`), no temp file. Put standing
@@ -160,6 +169,9 @@ Do not spend a run on a smoke test first; run the actual task.
 - `permission:` lines — the agent asked for something its `--permissions`
   level denies. Not a malfunction: decide whether to widen the preset (the
   exact command is printed) or rephrase the task within the level.
+- `note: answer truncated (N chars)` — the digest caps long answers at 2000
+  chars; the printed `pirun poll <preset> <id> --full` returns every
+  character. Never ship a capped answer as the deliverable.
 - `INTERRUPTED` — supervision died; inspect `pirun log <preset> <id>`.
 
 Transient provider failures retry automatically (five turn retries unless a
