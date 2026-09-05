@@ -199,7 +199,12 @@ Do not spend a run on a smoke test first; run the actual task.
   nothing to diagnose.
 - `FAILED` — read the `error:` lines; they carry the provider's own message.
   A failure after completed tool calls is not "nothing happened" — the
-  digest notes when side effects may already exist.
+  digest notes when side effects may already exist. On Antigravity a `note:`
+  also names which of three Google refusals happened, and they need opposite
+  moves: a *license* refusal is final for that account (switch accounts —
+  retrying loops), a *location* refusal is about where the call came from
+  (the same account works from a location Antigravity serves), and a
+  server-side *500* is worth one unchanged rerun before anything else.
 - `permission:` lines — the agent asked for something its `--permissions`
   level denies. Not a malfunction: decide whether to widen the preset (the
   exact command is printed) or rephrase the task within the level.

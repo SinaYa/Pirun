@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { classifyAntigravityBlock } from '../pirun-antigravity.ts';
 import { atomicWriteJson } from '../pirun-files.ts';
 import { isRecord, truncate } from './context.ts';
 import { jobDir, type JobMeta } from './store.ts';
@@ -110,8 +111,10 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 	let fileToolRace = false;
 	const seenTools = new Set<string>();
 	const seenErrors = new Set(digest.errors);
+	let eventsText = '';
 	if (existsSync(eventsPath)) {
-		for (const line of readFileSync(eventsPath, 'utf8').split(/\r?\n/)) {
+		eventsText = readFileSync(eventsPath, 'utf8');
+		for (const line of eventsText.split(/\r?\n/)) {
 			if (!line.trim()) continue;
 			let event: Record<string, unknown>;
 			try {
@@ -189,6 +192,12 @@ function buildAntigravityDigest(id: string, meta: JobMeta): Digest {
 		digest.status = 'failed';
 	} else if (!resultStatus || !digest.text) digest.status = 'empty';
 	else digest.status = 'ok';
+	// Only for a run that produced nothing: a successful answer may quote
+	// these phrases as its own content.
+	if (digest.status === 'failed' || digest.status === 'empty') {
+		const block = classifyAntigravityBlock(`${digest.errors.join('\n')}\n${eventsText}`);
+		if (block) digest.notes.push(block.note);
+	}
 	applyKillMarker(digest, meta);
 	atomicWriteJson(digestPath, digest);
 	return digest;

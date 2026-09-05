@@ -41,6 +41,53 @@ export function seedAntigravityProfileDefaults(profileDir: string) {
 	writeFileSync(settingsPath, `${JSON.stringify({ enableTelemetry: false }, null, 2)}\n`, { mode: 0o600 });
 }
 
+/** Versioned scoop directories holding an agy.exe, newest install first. */
+function scoopAgyEntries(appDir: string) {
+	try {
+		return readdirSync(appDir)
+			.filter((name) => name !== 'current')
+			.map((name) => resolve(appDir, name, 'bin', 'agy.exe'))
+			.filter((entry) => existsSync(entry))
+			.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Installation layouts agy also ships into, probed only after the canonical
+ * paths and PATH have all missed. Every install that already resolved keeps
+ * resolving to the same binary — this tier only turns a false "not found"
+ * into a working path.
+ */
+export function fallbackAntigravityPaths(): string[] {
+	if (process.platform !== 'win32') {
+		const home = process.env.HOME;
+		return [
+			'/usr/local/bin/agy',
+			'/usr/bin/agy',
+			'/opt/antigravity/bin/agy',
+			'/opt/antigravity/agy',
+			...(home ? [resolve(home, 'bin', 'agy')] : [])
+		];
+	}
+	const paths: string[] = [];
+	for (const variable of ['LOCALAPPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)', 'ProgramData', 'APPDATA']) {
+		const root = process.env[variable];
+		if (!root) continue;
+		paths.push(resolve(root, 'agy', 'bin', 'agy.exe'), resolve(root, 'Programs', 'agy', 'bin', 'agy.exe'));
+	}
+	const scoopApps = [
+		process.env.SCOOP && resolve(process.env.SCOOP, 'apps'),
+		process.env.USERPROFILE && resolve(process.env.USERPROFILE, 'scoop', 'apps')
+	].filter((root): root is string => Boolean(root));
+	for (const apps of scoopApps) {
+		// scoop keeps a "current" junction beside the versioned directories.
+		paths.push(resolve(apps, 'agy', 'current', 'bin', 'agy.exe'), ...scoopAgyEntries(resolve(apps, 'agy')));
+	}
+	return paths;
+}
+
 export function findAntigravityEntry() {
 	const candidates = [
 		process.env.PIRUN_ANTIGRAVITY_ENTRY,
@@ -58,10 +105,15 @@ export function findAntigravityEntry() {
 			.find(Boolean);
 		if (found) return found;
 	} catch {
-		// Fall through to the actionable error below.
+		// Fall through to the wider search, then to the actionable error.
+	}
+	for (const candidate of fallbackAntigravityPaths()) {
+		if (existsSync(candidate)) return candidate;
 	}
 	throw new Error(
-		'could not find the Antigravity CLI. Install agy from https://antigravity.google/docs/cli/install/ ' +
+		'could not find the Antigravity CLI (searched PATH, %LOCALAPPDATA%, Program Files, scoop, ' +
+			'~/.local/bin, /usr/local/bin and /opt/antigravity). Install agy from ' +
+			'https://antigravity.google/docs/cli/install/ ' +
 			'or set PIRUN_ANTIGRAVITY_ENTRY to the executable path.'
 	);
 }
@@ -266,4 +318,48 @@ export function markAntigravityAuthenticated(profileDir: string, isolationMode: 
 		JSON.stringify({ authenticatedAt: new Date().toISOString(), storage: 'file', isolationMode }, null, 2),
 		{ mode: 0o600 }
 	);
+}
+
+/**
+ * Three refusals agy can surface that all read as an opaque error but need
+ * opposite responses: an account without an Antigravity license, a location
+ * Google will not serve, and a Google-side fault. Naming which one happened
+ * is the difference between a caller retrying usefully and retrying forever.
+ */
+export type AntigravityBlockKind = 'license' | 'location' | 'server';
+
+export interface AntigravityBlock {
+	kind: AntigravityBlockKind;
+	/** One line for the digest, phrased as the next thing to do. */
+	note: string;
+}
+
+const LICENSE_BLOCK = /SUBSCRIPTION_REQUIRED|do not have a valid license of this product|#3501/i;
+const LOCATION_BLOCK = /User location is not supported|Account ineligible|not eligible for Antigravity/i;
+const SERVER_BLOCK = /Internal error encountered|HTTP 500 Internal Server Error/i;
+
+/**
+ * License is tested first: a 403 body can also carry location wording, never
+ * the reverse, and a missing license is the one no local change can fix.
+ */
+export function classifyAntigravityBlock(text: string): AntigravityBlock | null {
+	if (LICENSE_BLOCK.test(text)) {
+		return {
+			kind: 'license',
+			note: 'Google refused this account for lack of an Antigravity license (403 SUBSCRIPTION_REQUIRED) — no pirun or agy setting changes that; use an account that has access'
+		};
+	}
+	if (LOCATION_BLOCK.test(text)) {
+		return {
+			kind: 'location',
+			note: 'Google refused the request on location, not on the account — the same account can work from a location Antigravity serves'
+		};
+	}
+	if (SERVER_BLOCK.test(text)) {
+		return {
+			kind: 'server',
+			note: 'Google returned a server-side 500, not a pirun or account fault — one unchanged rerun is worth trying before switching accounts'
+		};
+	}
+	return null;
 }
